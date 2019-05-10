@@ -1,5 +1,5 @@
 {
-  "author": "hannah",
+  "author": "Protocol Labs",
   "bugs": {
     "url": "https://github.com/ipfs/go-peertaskqueue"
   },
@@ -23,8 +23,8 @@
   "gxVersion": "0.14.0",
   "language": "go",
   "license": "",
-  "name": ".",
+  "name": "go-peertaskqueue",
   "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
 
