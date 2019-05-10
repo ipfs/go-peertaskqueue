@@ -1,0 +1,30 @@
+{
+  "author": "hannah",
+  "bugs": {
+    "url": "https://github.com/ipfs/go-peertaskqueue"
+  },
+  "gx": {
+    "dvcsimport": "github.com/ipfs/go-peertaskqueue"
+  },
+  "gxDependencies": [
+    {
+      "author": "hsanjuan",
+      "hash": "QmZUbTDJ39JpvtFCSubiWeUTQRvMA1tVE5RZCJrY4oeAsC",
+      "name": "go-ipfs-pq",
+      "version": "0.0.1"
+    },
+    {
+      "author": "whyrusleeping",
+      "hash": "QmYVXrKrKHDC9FobgmcmshCDyWwdrfwfanNQN4oxJ9Fk3h",
+      "name": "go-libp2p-peer",
+      "version": "3.1.2"
+    }
+  ],
+  "gxVersion": "0.14.0",
+  "language": "go",
+  "license": "",
+  "name": ".",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "0.1.0"
+}
+
