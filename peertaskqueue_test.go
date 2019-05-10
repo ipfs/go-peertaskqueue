@@ -124,3 +124,36 @@ func TestPeerRepeats(t *testing.T) {
 		}
 	}
 }
+
+func TestCleaningUpQueues(t *testing.T) {
+	ptq := New()
+
+	peer := testutil.GeneratePeers(1)[0]
+	var peerTasks []peertask.Task
+	for i := 0; i < 5; i++ {
+		is := fmt.Sprint(i)
+		peerTasks = append(peerTasks, peertask.Task{Identifier: is})
+	}
+
+	// push a block, pop a block, complete everything, should be removed
+	ptq.PushBlock(peer, peerTasks...)
+	task := ptq.PopBlock()
+	task.Done(task.Tasks)
+	task = ptq.PopBlock()
+
+	if task != nil || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
+		t.Fatal("PeerTracker should have been removed because it's idle")
+	}
+
+	// push a block, remove each of its entries, should be removed
+	ptq.PushBlock(peer, peerTasks...)
+	for _, peerTask := range peerTasks {
+		ptq.Remove(peerTask.Identifier, peer)
+	}
+	task = ptq.PopBlock()
+
+	if task != nil || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
+		t.Fatal("Partner should have been removed because it's idle")
+	}
+
+}

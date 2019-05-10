@@ -35,7 +35,7 @@ func (ptq *PeerTaskQueue) PushBlock(to peer.ID, tasks ...peertask.Task) {
 	defer ptq.lock.Unlock()
 	peerTracker, ok := ptq.peerTrackers[to]
 	if !ok {
-		peerTracker = peertracker.New()
+		peerTracker = peertracker.New(to)
 		ptq.pQueue.Push(peerTracker)
 		ptq.peerTrackers[to] = peerTracker
 	}
@@ -61,7 +61,13 @@ func (ptq *PeerTaskQueue) PopBlock() *peertask.TaskBlock {
 	peerTracker := ptq.pQueue.Pop().(*peertracker.PeerTracker)
 
 	out := peerTracker.PopBlock()
-	ptq.pQueue.Push(peerTracker)
+	if peerTracker.IsIdle() {
+		target := peerTracker.Target()
+		delete(ptq.peerTrackers, target)
+		delete(ptq.frozenPeers, target)
+	} else {
+		ptq.pQueue.Push(peerTracker)
+	}
 	return out
 }
 

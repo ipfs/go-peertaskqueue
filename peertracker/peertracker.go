@@ -11,7 +11,7 @@ import (
 // PeerTracker tracks task blocks for a single peer, as well as active tasks
 // for that peer
 type PeerTracker struct {
-
+	target peer.ID
 	// Active is the number of track tasks this peer is currently
 	// processing
 	// active must be locked around as it will be updated externally
@@ -34,8 +34,9 @@ type PeerTracker struct {
 }
 
 // New creates a new PeerTracker
-func New() *PeerTracker {
+func New(target peer.ID) *PeerTracker {
 	return &PeerTracker{
+		target:         target,
 		taskBlockQueue: pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
 		taskMap:        make(map[peertask.Identifier]*peertask.TaskBlock),
 		activeTasks:    make(map[peertask.Identifier]struct{}),
@@ -90,6 +91,18 @@ func (p *PeerTracker) TaskDone(identifier peertask.Identifier) {
 		panic("more tasks finished than started!")
 	}
 	p.activelk.Unlock()
+}
+
+// Target returns the peer that this peer tracker tracks tasks for
+func (p *PeerTracker) Target() peer.ID {
+	return p.target
+}
+
+// IsIdle returns true if the peer has no active tasks or queued tasks
+func (p *PeerTracker) IsIdle() bool {
+	p.activelk.Lock()
+	defer p.activelk.Unlock()
+	return p.numTasks == 0 && p.active == 0
 }
 
 // Index implements pq.Elem.
