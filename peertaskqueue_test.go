@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ipfs/go-graphsync/responsemanager/peertaskqueue/peertask"
-	"github.com/ipfs/go-graphsync/testutil"
+	"github.com/ipfs/go-peertaskqueue/peertask"
+	"github.com/ipfs/go-peertaskqueue/testutil"
 )
 
 func TestPushPop(t *testing.T) {

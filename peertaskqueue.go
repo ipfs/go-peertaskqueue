@@ -3,9 +3,9 @@ package peertaskqueue
 import (
 	"sync"
 
-	"github.com/ipfs/go-graphsync/responsemanager/peertaskqueue/peertask"
-	"github.com/ipfs/go-graphsync/responsemanager/peertaskqueue/peertracker"
 	pq "github.com/ipfs/go-ipfs-pq"
+	"github.com/ipfs/go-peertaskqueue/peertask"
+	"github.com/ipfs/go-peertaskqueue/peertracker"
 	peer "github.com/libp2p/go-libp2p-peer"
 )
 
