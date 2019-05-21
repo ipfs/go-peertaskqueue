@@ -14,19 +14,55 @@ import (
 // to execute the block with the highest priority, or otherwise the one added
 // first if priorities are equal.
 type PeerTaskQueue struct {
-	lock         sync.Mutex
-	pQueue       pq.PQ
-	peerTrackers map[peer.ID]*peertracker.PeerTracker
-	frozenPeers  map[peer.ID]struct{}
+	lock           sync.Mutex
+	pQueue         pq.PQ
+	peerTrackers   map[peer.ID]*peertracker.PeerTracker
+	frozenPeers    map[peer.ID]struct{}
+	ignoreFreezing bool
+}
+
+// Option is a function that configures the peer task queue
+type Option func(*PeerTaskQueue) Option
+
+func chain(firstOption Option, secondOption Option) Option {
+	return func(ptq *PeerTaskQueue) Option {
+		firstReverse := firstOption(ptq)
+		secondReverse := secondOption(ptq)
+		return chain(secondReverse, firstReverse)
+	}
+}
+
+// IgnoreFreezing is an option that can make the task queue ignore freezing and unfreezing
+func IgnoreFreezing(ignoreFreezing bool) Option {
+	return func(ptq *PeerTaskQueue) Option {
+		previous := ptq.ignoreFreezing
+		ptq.ignoreFreezing = ignoreFreezing
+		return IgnoreFreezing(previous)
+	}
 }
 
 // New creates a new PeerTaskQueue
-func New() *PeerTaskQueue {
-	return &PeerTaskQueue{
+func New(options ...Option) *PeerTaskQueue {
+	ptq := &PeerTaskQueue{
 		peerTrackers: make(map[peer.ID]*peertracker.PeerTracker),
 		frozenPeers:  make(map[peer.ID]struct{}),
 		pQueue:       pq.New(peertracker.PeerCompare),
 	}
+	ptq.Options(options...)
+	return ptq
+}
+
+// Options uses configuration functions to configure the peer task queue.
+// It returns an Option that can be called to reverse the changes.
+func (ptq *PeerTaskQueue) Options(options ...Option) Option {
+	if len(options) == 0 {
+		return nil
+	}
+	if len(options) == 1 {
+		return options[0](ptq)
+	}
+	reverse := options[0](ptq)
+	return chain(ptq.Options(options[1:]...), reverse)
 }
 
 // PushBlock adds a new block of tasks for the given peer to the queue
@@ -81,11 +117,13 @@ func (ptq *PeerTaskQueue) Remove(identifier peertask.Identifier, p peer.ID) {
 		// block we were about to send them, we should wait a short period of time
 		// to make sure we receive any other in-flight cancels before sending
 		// them a block they already potentially have
-		if !peerTracker.IsFrozen() {
-			ptq.frozenPeers[p] = struct{}{}
-		}
+		if !ptq.ignoreFreezing {
+			if !peerTracker.IsFrozen() {
+				ptq.frozenPeers[p] = struct{}{}
+			}
 
-		peerTracker.Freeze()
+			peerTracker.Freeze()
+		}
 		ptq.pQueue.Update(peerTracker.Index())
 	}
 	ptq.lock.Unlock()

@@ -70,6 +70,66 @@ func TestPushPop(t *testing.T) {
 	}
 }
 
+func TestFreezeUnfreeze(t *testing.T) {
+	ptq := New()
+	peers := testutil.GeneratePeers(4)
+	a := peers[0]
+	b := peers[1]
+	c := peers[2]
+	d := peers[3]
+
+	// Have each push some blocks
+
+	for i := 0; i < 5; i++ {
+		is := fmt.Sprint(i)
+		ptq.PushBlock(a, peertask.Task{Identifier: is})
+		ptq.PushBlock(b, peertask.Task{Identifier: is})
+		ptq.PushBlock(c, peertask.Task{Identifier: is})
+		ptq.PushBlock(d, peertask.Task{Identifier: is})
+	}
+
+	// now, pop off four tasks, there should be one from each
+	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+
+	ptq.Remove(peertask.Task{Identifier: "1"}, b)
+
+	// b should be frozen, causing it to get skipped in the rotation
+	matchNTasks(t, ptq, 3, a.Pretty(), c.Pretty(), d.Pretty())
+
+	ptq.ThawRound()
+
+	matchNTasks(t, ptq, 1, b.Pretty())
+
+}
+
+func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
+	ptq := New(IgnoreFreezing(true))
+	peers := testutil.GeneratePeers(4)
+	a := peers[0]
+	b := peers[1]
+	c := peers[2]
+	d := peers[3]
+
+	// Have each push some blocks
+
+	for i := 0; i < 5; i++ {
+		is := fmt.Sprint(i)
+		ptq.PushBlock(a, peertask.Task{Identifier: is})
+		ptq.PushBlock(b, peertask.Task{Identifier: is})
+		ptq.PushBlock(c, peertask.Task{Identifier: is})
+		ptq.PushBlock(d, peertask.Task{Identifier: is})
+	}
+
+	// now, pop off four tasks, there should be one from each
+	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+
+	ptq.Remove(peertask.Task{Identifier: "1"}, b)
+
+	// b should be frozen, causing it to get skipped in the rotation
+	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+
+}
+
 // This test checks that peers wont starve out other peers
 func TestPeerRepeats(t *testing.T) {
 	ptq := New()
@@ -90,25 +150,7 @@ func TestPeerRepeats(t *testing.T) {
 	}
 
 	// now, pop off four tasks, there should be one from each
-	var targets []string
-	var tasks []*peertask.TaskBlock
-	for i := 0; i < 4; i++ {
-		t := ptq.PopBlock()
-		targets = append(targets, t.Target.Pretty())
-		tasks = append(tasks, t)
-	}
-
-	expected := []string{a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty()}
-	sort.Strings(expected)
-	sort.Strings(targets)
-
-	t.Log(targets)
-	t.Log(expected)
-	for i, s := range targets {
-		if expected[i] != s {
-			t.Fatal("unexpected peer", s, expected[i])
-		}
-	}
+	tasks := matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
 
 	// Now, if one of the tasks gets finished, the next task off the queue should
 	// be for the same peer
@@ -156,4 +198,27 @@ func TestCleaningUpQueues(t *testing.T) {
 		t.Fatal("Partner should have been removed because it's idle")
 	}
 
+}
+
+func matchNTasks(t *testing.T, ptq *PeerTaskQueue, n int, expected ...string) []*peertask.TaskBlock {
+	var targets []string
+	var tasks []*peertask.TaskBlock
+	for i := 0; i < n; i++ {
+		t := ptq.PopBlock()
+		targets = append(targets, t.Target.Pretty())
+		tasks = append(tasks, t)
+	}
+
+	sort.Strings(expected)
+	sort.Strings(targets)
+
+	t.Log(targets)
+	t.Log(expected)
+	for i, s := range targets {
+		if expected[i] != s {
+			t.Fatal("unexpected peer", s, expected[i])
+		}
+	}
+
+	return tasks
 }
