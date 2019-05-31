@@ -4,7 +4,7 @@ import (
 	"time"
 
 	pq "github.com/ipfs/go-ipfs-pq"
-	peer "github.com/libp2p/go-libp2p-peer"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // FIFOCompare is a basic task comparator that returns tasks in the order created.
