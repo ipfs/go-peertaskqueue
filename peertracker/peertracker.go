@@ -5,7 +5,7 @@ import (
 
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
-	peer "github.com/libp2p/go-libp2p-peer"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // PeerTracker tracks task blocks for a single peer, as well as active tasks

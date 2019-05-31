@@ -1,6 +1,6 @@
 package testutil
 
-import peer "github.com/libp2p/go-libp2p-peer"
+import peer "github.com/libp2p/go-libp2p-core/peer"
 
 var peerSeq int
 
