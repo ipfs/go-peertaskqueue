@@ -92,7 +92,7 @@ func TestFreezeUnfreeze(t *testing.T) {
 	// now, pop off four tasks, there should be one from each
 	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
 
-	ptq.Remove(peertask.Task{Identifier: "1"}, b)
+	ptq.Remove("1", b)
 
 	// b should be frozen, causing it to get skipped in the rotation
 	matchNTasks(t, ptq, 3, a.Pretty(), c.Pretty(), d.Pretty())
@@ -100,6 +100,12 @@ func TestFreezeUnfreeze(t *testing.T) {
 	ptq.ThawRound()
 
 	matchNTasks(t, ptq, 1, b.Pretty())
+
+	// remove none existent task
+	ptq.Remove("-1", b)
+
+	// b should not be frozen
+	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
 
 }
 
@@ -124,7 +130,7 @@ func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
 	// now, pop off four tasks, there should be one from each
 	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
 
-	ptq.Remove(peertask.Task{Identifier: "1"}, b)
+	ptq.Remove("1", b)
 
 	// b should be frozen, causing it to get skipped in the rotation
 	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
