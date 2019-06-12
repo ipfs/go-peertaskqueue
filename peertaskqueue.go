@@ -167,9 +167,7 @@ func (ptq *PeerTaskQueue) PopBlock() *peertask.TaskBlock {
 // Remove removes a task from the queue.
 func (ptq *PeerTaskQueue) Remove(identifier peertask.Identifier, p peer.ID) {
 	ptq.lock.Lock()
-	peerTracker, ok := ptq.peerTrackers[p]
-	if ok {
-		peerTracker.Remove(identifier)
+	if peerTracker, ok := ptq.peerTrackers[p]; ok && peerTracker.Remove(identifier) {
 		// we now also 'freeze' that partner. If they sent us a cancel for a
 		// block we were about to send them, we should wait a short period of time
 		// to make sure we receive any other in-flight cancels before sending
