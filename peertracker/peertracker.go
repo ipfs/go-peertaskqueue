@@ -125,19 +125,43 @@ func (p *PeerTracker) PushBlock(target peer.ID, tasks []peertask.Task, done func
 	var priority int
 	newTasks := make([]peertask.Task, 0, len(tasks))
 	for _, task := range tasks {
+		// If the task is currently active (being processed)
 		if _, ok := p.activeTasks[task.Identifier]; ok {
-			continue
-		}
-		if taskBlock, ok := p.taskMap[task.Identifier]; ok {
-			if task.Priority > taskBlock.Priority {
-				taskBlock.Priority = task.Priority
-				p.taskBlockQueue.Update(taskBlock.Index())
+			// We can only replace tasks that are not active.
+			// If the active task could not have been replaced (even if it
+			// wasn't active) by the new task, that means the new task is
+			// not doing anything useful, so skip adding the new task.
+			canReplace := true
+			if taskBlock, ok := p.taskMap[task.Identifier]; ok {
+				canReplace = taskBlock.CanReplaceTask(task)
 			}
-			continue
+			if !canReplace {
+				continue
+			}
+		} else {
+			// If there is already a task with this identifier, and the new task
+			// has a higher priority than the old task block, move the old task
+			// block towards the front of the queue.
+			if taskBlock, ok := p.taskMap[task.Identifier]; ok {
+				if task.Priority > taskBlock.Priority {
+					taskBlock.Priority = task.Priority
+					p.taskBlockQueue.Update(taskBlock.Index())
+				}
+				// Replace the task (if it's replaceable)
+				if taskBlock.ReplaceTask(task) {
+					// If the task was replaced, we don't need to add the new
+					// task to the queue
+					continue
+				}
+			}
 		}
+
+		// The block priority will be set to the highest priority of all the
+		// tasks in the block
 		if task.Priority > priority {
 			priority = task.Priority
 		}
+
 		newTasks = append(newTasks, task)
 	}
 
@@ -145,6 +169,8 @@ func (p *PeerTracker) PushBlock(target peer.ID, tasks []peertask.Task, done func
 		return
 	}
 
+	// Add the task block to the queue, and create a mapping of
+	// task -> task block
 	taskBlock := peertask.NewTaskBlock(newTasks, priority, target, done)
 	p.taskBlockQueue.Push(taskBlock)
 	for _, task := range newTasks {

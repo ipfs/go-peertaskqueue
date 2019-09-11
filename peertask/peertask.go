@@ -33,10 +33,14 @@ func WrapCompare(f func(a, b *TaskBlock) bool) func(a, b pq.Elem) bool {
 // to act on a task once it exits the queue.
 type Identifier interface{}
 
+type TaskInfo interface{}
+
 // Task is a single task to be executed as part of a task block.
 type Task struct {
-	Identifier Identifier
-	Priority   int
+	Identifier  Identifier
+	Priority    int
+	Replaceable bool
+	Info        TaskInfo
 }
 
 // TaskBlock is a block of tasks to execute on a single peer.
@@ -66,6 +70,38 @@ func NewTaskBlock(tasks []Task, priority int, target peer.ID, done func([]Task))
 		toPrune:  make(map[Identifier]struct{}, len(tasks)),
 		created:  time.Now(),
 	}
+}
+
+func (pt *TaskBlock) ReplaceTask(task Task) bool {
+	// ReplaceTask() should not be called on a Prunable task, but check
+	// just in case
+	_, ok := pt.toPrune[task.Identifier]
+	if ok {
+		return false
+	}
+
+	if i, ok := pt.canReplaceTask(task); ok {
+		pt.Tasks[i] = task
+		return true
+	}
+	return false
+}
+
+func (pt *TaskBlock) CanReplaceTask(task Task) bool {
+	_, ok := pt.canReplaceTask(task)
+	return ok
+}
+
+func (pt *TaskBlock) canReplaceTask(task Task) (int, bool) {
+	for i, existing := range pt.Tasks {
+		if existing.Identifier == task.Identifier {
+			if existing.Replaceable && !task.Replaceable {
+				return i, true
+			}
+			return -1, false
+		}
+	}
+	return -1, false
 }
 
 // MarkPrunable marks any tasks with the given identifier as prunable at the time
