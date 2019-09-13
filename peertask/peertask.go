@@ -1,6 +1,7 @@
 package peertask
 
 import (
+	"fmt"
 	"time"
 
 	pq "github.com/ipfs/go-ipfs-pq"
@@ -39,7 +40,7 @@ type TaskInfo interface{}
 type Task struct {
 	Identifier  Identifier
 	Priority    int
-	Replaceable bool
+	IsBlock     bool
 	Info        TaskInfo
 }
 
@@ -54,9 +55,14 @@ type TaskBlock struct {
 
 	// toPrune are the tasks that have already been taken care of as part of
 	// a different task block which can be removed from the task block.
-	toPrune map[Identifier]struct{}
+	// toPrune map[Identifier]struct{}
+	toPrune map[string]struct{}
 	created time.Time // created marks the time that the task was added to the queue
 	index   int       // book-keeping field used by the pq container
+}
+
+func (t *Task) String() string {
+	return fmt.Sprintf("Cid: %s\nIsBlock: %t\nInfo:\n%s\n", t.Identifier, t.IsBlock, t.Info)
 }
 
 // NewTaskBlock creates a new task block with the given tasks, priority, target
@@ -67,7 +73,8 @@ func NewTaskBlock(tasks []Task, priority int, target peer.ID, done func([]Task))
 		Priority: priority,
 		Target:   target,
 		Done:     done,
-		toPrune:  make(map[Identifier]struct{}, len(tasks)),
+		// toPrune:  make(map[Identifier]struct{}, len(tasks)),
+		toPrune:  make(map[string]struct{}, len(tasks)),
 		created:  time.Now(),
 	}
 }
@@ -75,27 +82,30 @@ func NewTaskBlock(tasks []Task, priority int, target peer.ID, done func([]Task))
 func (pt *TaskBlock) ReplaceTask(task Task) bool {
 	// ReplaceTask() should not be called on a Prunable task, but check
 	// just in case
-	_, ok := pt.toPrune[task.Identifier]
+	_, ok := pt.toPrune[pt.getTaskId(task.Identifier, task.IsBlock)]
 	if ok {
+		// fmt.Printf("ReplaceTask %s (cannot: pruned)\n", task.Identifier)
 		return false
 	}
 
 	if i, ok := pt.canReplaceTask(task); ok {
 		pt.Tasks[i] = task
+		// fmt.Printf("ReplaceTask %s\n", task.Identifier)
 		return true
 	}
+	// fmt.Printf("ReplaceTask %s (cannot replace task with that cid)\n", task.Identifier)
 	return false
 }
 
-func (pt *TaskBlock) CanReplaceTask(task Task) bool {
-	_, ok := pt.canReplaceTask(task)
-	return ok
-}
+// func (pt *TaskBlock) CanReplaceTask(task Task) bool {
+// 	_, ok := pt.canReplaceTask(task)
+// 	return ok
+// }
 
 func (pt *TaskBlock) canReplaceTask(task Task) (int, bool) {
 	for i, existing := range pt.Tasks {
 		if existing.Identifier == task.Identifier {
-			if existing.Replaceable && !task.Replaceable {
+			if !existing.IsBlock && task.IsBlock {
 				return i, true
 			}
 			return -1, false
@@ -106,8 +116,9 @@ func (pt *TaskBlock) canReplaceTask(task Task) (int, bool) {
 
 // MarkPrunable marks any tasks with the given identifier as prunable at the time
 // the task block is pulled of the queue to execute (because they've already been removed).
-func (pt *TaskBlock) MarkPrunable(identifier Identifier) {
-	pt.toPrune[identifier] = struct{}{}
+func (pt *TaskBlock) MarkPrunable(identifier Identifier, isBlock bool) {
+	// pt.toPrune[identifier] = struct{}{}
+	pt.toPrune[pt.getTaskId(identifier, isBlock)] = struct{}{}
 }
 
 // PruneTasks removes all tasks previously marked as prunable from the lists of
@@ -115,7 +126,8 @@ func (pt *TaskBlock) MarkPrunable(identifier Identifier) {
 func (pt *TaskBlock) PruneTasks() {
 	newTasks := make([]Task, 0, len(pt.Tasks)-len(pt.toPrune))
 	for _, task := range pt.Tasks {
-		if _, ok := pt.toPrune[task.Identifier]; !ok {
+		// if _, ok := pt.toPrune[task.Identifier]; !ok {
+		if _, ok := pt.toPrune[pt.getTaskId(task.Identifier, task.IsBlock)]; !ok {
 			newTasks = append(newTasks, task)
 		}
 	}
@@ -130,4 +142,8 @@ func (pt *TaskBlock) Index() int {
 // SetIndex implements pq.Elem.
 func (pt *TaskBlock) SetIndex(i int) {
 	pt.index = i
+}
+
+func (pt *TaskBlock) getTaskId(identifier Identifier, isBlock bool) string {
+	return fmt.Sprintf("%s-%t", identifier, isBlock)
 }

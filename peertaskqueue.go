@@ -135,7 +135,7 @@ func (ptq *PeerTaskQueue) PushBlock(to peer.ID, tasks ...peertask.Task) {
 	peerTracker.PushBlock(to, tasks, func(e []peertask.Task) {
 		ptq.lock.Lock()
 		for _, task := range e {
-			peerTracker.TaskDone(task.Identifier)
+			peerTracker.TaskDone(task.Identifier, task.IsBlock)
 		}
 		ptq.pQueue.Update(peerTracker.Index())
 		ptq.lock.Unlock()
