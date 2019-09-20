@@ -1,7 +1,6 @@
 package peertask
 
 import (
-	"fmt"
 	"time"
 
 	pq "github.com/ipfs/go-ipfs-pq"
@@ -9,13 +8,13 @@ import (
 )
 
 // FIFOCompare is a basic task comparator that returns tasks in the order created.
-var FIFOCompare = func(a, b *TaskBlock) bool {
+var FIFOCompare = func(a, b *QueueTask) bool {
 	return a.created.Before(b.created)
 }
 
 // PriorityCompare respects the target peer's task priority. For tasks involving
 // different peers, the oldest task is prioritized.
-var PriorityCompare = func(a, b *TaskBlock) bool {
+var PriorityCompare = func(a, b *QueueTask) bool {
 	if a.Target == b.Target {
 		return a.Priority > b.Priority
 	}
@@ -24,9 +23,9 @@ var PriorityCompare = func(a, b *TaskBlock) bool {
 
 // WrapCompare wraps a TaskBlock comparison function so it can be used as
 // comparison for a priority queue
-func WrapCompare(f func(a, b *TaskBlock) bool) func(a, b pq.Elem) bool {
+func WrapCompare(f func(a, b *QueueTask) bool) func(a, b pq.Elem) bool {
 	return func(a, b pq.Elem) bool {
-		return f(a.(*TaskBlock), b.(*TaskBlock))
+		return f(a.(*QueueTask), b.(*QueueTask))
 	}
 }
 
@@ -34,116 +33,51 @@ func WrapCompare(f func(a, b *TaskBlock) bool) func(a, b pq.Elem) bool {
 // to act on a task once it exits the queue.
 type Identifier interface{}
 
-type TaskInfo interface{}
-
 // Task is a single task to be executed as part of a task block.
 type Task struct {
-	Identifier  Identifier
-	Priority    int
-	IsBlock     bool
-	Info        TaskInfo
+	Identifier   Identifier
+	Priority     int
+	IsWantBlock  bool
+	IsDontHave   bool
+	SendDontHave bool
+	Size         int
 }
 
-// TaskBlock is a block of tasks to execute on a single peer.
-type TaskBlock struct {
-	Tasks    []Task
-	Priority int
-	Target   peer.ID
-
-	// A callback to signal that this task block has been completed
-	Done func([]Task)
-
-	// toPrune are the tasks that have already been taken care of as part of
-	// a different task block which can be removed from the task block.
-	// toPrune map[Identifier]struct{}
-	toPrune map[string]struct{}
+// QueueTask contains a Task, and also some bookkeeping information.
+// It is used internally by the PeerTracker to keep track of tasks.
+type QueueTask struct {
+	Task
+	Removed bool
+	Target  peer.ID
 	created time.Time // created marks the time that the task was added to the queue
 	index   int       // book-keeping field used by the pq container
 }
 
-func (t *Task) String() string {
-	return fmt.Sprintf("Cid: %s\nIsBlock: %t\nInfo:\n%s\n", t.Identifier, t.IsBlock, t.Info)
+// ReplaceWith copies the fields from the given QueueTask into this QueueTask.
+func (t *QueueTask) ReplaceWith(replacement *QueueTask) {
+	t.Priority = replacement.Priority
+	t.IsWantBlock = replacement.IsWantBlock
+	t.SendDontHave = replacement.SendDontHave
+	t.IsDontHave = replacement.IsDontHave
+	t.Size = replacement.Size
 }
 
-// NewTaskBlock creates a new task block with the given tasks, priority, target
-// peer, and task completion function.
-func NewTaskBlock(tasks []Task, priority int, target peer.ID, done func([]Task)) *TaskBlock {
-	return &TaskBlock{
-		Tasks:    tasks,
-		Priority: priority,
-		Target:   target,
-		Done:     done,
-		// toPrune:  make(map[Identifier]struct{}, len(tasks)),
-		toPrune:  make(map[string]struct{}, len(tasks)),
-		created:  time.Now(),
+// NewQueueTask creates a new QueueTask from the given Task.
+func NewQueueTask(task Task, target peer.ID, created time.Time) *QueueTask {
+	return &QueueTask{
+		Task:    task,
+		Removed: false,
+		Target:  target,
+		created: created,
 	}
-}
-
-func (pt *TaskBlock) ReplaceTask(task Task) bool {
-	// ReplaceTask() should not be called on a Prunable task, but check
-	// just in case
-	_, ok := pt.toPrune[pt.getTaskId(task.Identifier, task.IsBlock)]
-	if ok {
-		// fmt.Printf("ReplaceTask %s (cannot: pruned)\n", task.Identifier)
-		return false
-	}
-
-	if i, ok := pt.canReplaceTask(task); ok {
-		pt.Tasks[i] = task
-		// fmt.Printf("ReplaceTask %s\n", task.Identifier)
-		return true
-	}
-	// fmt.Printf("ReplaceTask %s (cannot replace task with that cid)\n", task.Identifier)
-	return false
-}
-
-// func (pt *TaskBlock) CanReplaceTask(task Task) bool {
-// 	_, ok := pt.canReplaceTask(task)
-// 	return ok
-// }
-
-func (pt *TaskBlock) canReplaceTask(task Task) (int, bool) {
-	for i, existing := range pt.Tasks {
-		if existing.Identifier == task.Identifier {
-			if !existing.IsBlock && task.IsBlock {
-				return i, true
-			}
-			return -1, false
-		}
-	}
-	return -1, false
-}
-
-// MarkPrunable marks any tasks with the given identifier as prunable at the time
-// the task block is pulled of the queue to execute (because they've already been removed).
-func (pt *TaskBlock) MarkPrunable(identifier Identifier, isBlock bool) {
-	// pt.toPrune[identifier] = struct{}{}
-	pt.toPrune[pt.getTaskId(identifier, isBlock)] = struct{}{}
-}
-
-// PruneTasks removes all tasks previously marked as prunable from the lists of
-// tasks in the block
-func (pt *TaskBlock) PruneTasks() {
-	newTasks := make([]Task, 0, len(pt.Tasks)-len(pt.toPrune))
-	for _, task := range pt.Tasks {
-		// if _, ok := pt.toPrune[task.Identifier]; !ok {
-		if _, ok := pt.toPrune[pt.getTaskId(task.Identifier, task.IsBlock)]; !ok {
-			newTasks = append(newTasks, task)
-		}
-	}
-	pt.Tasks = newTasks
 }
 
 // Index implements pq.Elem.
-func (pt *TaskBlock) Index() int {
+func (pt *QueueTask) Index() int {
 	return pt.index
 }
 
 // SetIndex implements pq.Elem.
-func (pt *TaskBlock) SetIndex(i int) {
+func (pt *QueueTask) SetIndex(i int) {
 	pt.index = i
-}
-
-func (pt *TaskBlock) getTaskId(identifier Identifier, isBlock bool) string {
-	return fmt.Sprintf("%s-%t", identifier, isBlock)
 }

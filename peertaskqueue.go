@@ -19,7 +19,7 @@ const (
 type hookFunc func(p peer.ID, event peerTaskQueueEvent)
 
 // PeerTaskQueue is a prioritized list of tasks to be executed on peers.
-// The queue puts tasks on in blocks, then alternates between peers (roughly)
+// Tasks are added to the queue, then popped off alternately between peers (roughly)
 // to execute the block with the highest priority, or otherwise the one added
 // first if priorities are equal.
 type PeerTaskQueue struct {
@@ -120,10 +120,11 @@ func (ptq *PeerTaskQueue) callHooks(to peer.ID, event peerTaskQueueEvent) {
 	}
 }
 
-// PushBlock adds a new block of tasks for the given peer to the queue
-func (ptq *PeerTaskQueue) PushBlock(to peer.ID, tasks ...peertask.Task) {
+// PushTasks adds a new group of tasks for the given peer to the queue
+func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
+
 	peerTracker, ok := ptq.peerTrackers[to]
 	if !ok {
 		peerTracker = peertracker.New(to)
@@ -132,41 +133,81 @@ func (ptq *PeerTaskQueue) PushBlock(to peer.ID, tasks ...peertask.Task) {
 		ptq.callHooks(to, peerAdded)
 	}
 
-	peerTracker.PushBlock(to, tasks, func(e []peertask.Task) {
-		ptq.lock.Lock()
-		for _, task := range e {
-			peerTracker.TaskDone(task.Identifier, task.IsBlock)
-		}
-		ptq.pQueue.Update(peerTracker.Index())
-		ptq.lock.Unlock()
-	})
+	peerTracker.PushTasks(tasks)
 	ptq.pQueue.Update(peerTracker.Index())
 }
 
-// PopBlock 'pops' the next block of tasks to be performed. Returns nil if no block exists.
-func (ptq *PeerTaskQueue) PopBlock() *peertask.TaskBlock {
+// PopTasks pops the highest priority tasks from the peer off the queue, up to
+// the given maximum size of those tasks.
+// If peer is "", the highest priority peer is chosen.
+func (ptq *PeerTaskQueue) PopTasks(from peer.ID, maxSize int) (peer.ID, []peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
-	if ptq.pQueue.Len() == 0 {
-		return nil
-	}
-	peerTracker := ptq.pQueue.Pop().(*peertracker.PeerTracker)
 
-	out := peerTracker.PopBlock()
+	if ptq.pQueue.Len() == 0 {
+		return "", nil
+	}
+
+	var peerTracker *peertracker.PeerTracker
+
+	// If the peer wasn't specified, choose the highest priority peer
+	if from == "" {
+		peerTracker = ptq.pQueue.Pop().(*peertracker.PeerTracker)
+		if peerTracker == nil {
+			return "", nil
+		}
+	} else {
+		// Get the requested peer tracker
+		var ok bool
+		peerTracker, ok = ptq.peerTrackers[from]
+		if !ok || peerTracker.IsIdle() {
+			return "", nil
+		}
+	}
+
+	// Get the highest priority tasks for the given peer
+	out := peerTracker.PopTasks(maxSize)
+
+	// If the peer has no more tasks, remove its peer tracker
 	if peerTracker.IsIdle() {
 		target := peerTracker.Target()
 		delete(ptq.peerTrackers, target)
 		delete(ptq.frozenPeers, target)
 		ptq.callHooks(target, peerRemoved)
 	} else {
+		// If it does have more tasks, put it back into the peer queue
 		ptq.pQueue.Push(peerTracker)
 	}
-	return out
+	return peerTracker.Target(), out
+}
+
+// TasksDone is called to indicate that the given tasks have completed
+// for the given peer
+func (ptq *PeerTaskQueue) TasksDone(to peer.ID, tasks ...peertask.Task) {
+	ptq.lock.Lock()
+	defer ptq.lock.Unlock()
+
+	// Get the peer tracker for the peer
+	peerTracker, ok := ptq.peerTrackers[to]
+	if !ok {
+		return
+	}
+
+	// Tell the peer tracker that the tasks have completed
+	for _, task := range tasks {
+		peerTracker.TaskDone(task.Identifier, task.IsWantBlock)
+	}
+
+	// This may affect the peer's position in the peer queue, so update if
+	// necessary
+	ptq.pQueue.Update(peerTracker.Index())
 }
 
 // Remove removes a task from the queue.
 func (ptq *PeerTaskQueue) Remove(identifier peertask.Identifier, p peer.ID) {
 	ptq.lock.Lock()
+	defer ptq.lock.Unlock()
+
 	peerTracker, ok := ptq.peerTrackers[p]
 	if ok {
 		if peerTracker.Remove(identifier) {
@@ -184,7 +225,6 @@ func (ptq *PeerTaskQueue) Remove(identifier peertask.Identifier, p peer.ID) {
 			ptq.pQueue.Update(peerTracker.Index())
 		}
 	}
-	ptq.lock.Unlock()
 }
 
 // FullThaw completely thaws all peers in the queue so they can execute tasks.
