@@ -47,7 +47,6 @@ type Task struct {
 // It is used internally by the PeerTracker to keep track of tasks.
 type QueueTask struct {
 	Task
-	Removed bool
 	Target  peer.ID
 	created time.Time // created marks the time that the task was added to the queue
 	index   int       // book-keeping field used by the pq container
@@ -66,7 +65,6 @@ func (t *QueueTask) ReplaceWith(replacement *QueueTask) {
 func NewQueueTask(task Task, target peer.ID, created time.Time) *QueueTask {
 	return &QueueTask{
 		Task:    task,
-		Removed: false,
 		Target:  target,
 		created: created,
 	}

@@ -14,23 +14,21 @@ import (
 // for that peer
 type PeerTracker struct {
 	target peer.ID
-	// Active is the number of track tasks this peer is currently
-	// processing
+
+	// Tasks that are pending being made active
+	pendingTasks map[string]*peertask.QueueTask
+
+	// Tasks that have been made active
 	// active must be locked around as it will be updated externally
 	activelk    sync.Mutex
 	activeBytes int
-	activeTasks map[string]struct{}
-
-	// total number of tasks for this peer
-	numTasks int
+	// map of task id -> size in bytes
+	activeTasks map[string]int
 
 	// for the PQ interface
 	index int
 
 	freezeVal int
-
-	// Map of task id -> task
-	taskMap map[string]*peertask.QueueTask
 
 	// priority queue of tasks belonging to this peer
 	taskQueue pq.PQ
@@ -39,10 +37,10 @@ type PeerTracker struct {
 // New creates a new PeerTracker
 func New(target peer.ID) *PeerTracker {
 	return &PeerTracker{
-		target:      target,
-		taskQueue:   pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
-		taskMap:     make(map[string]*peertask.QueueTask),
-		activeTasks: make(map[string]struct{}),
+		target:       target,
+		taskQueue:    pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
+		pendingTasks: make(map[string]*peertask.QueueTask),
+		activeTasks:  make(map[string]int),
 	}
 }
 
@@ -52,12 +50,13 @@ func PeerCompare(a, b pq.Elem) bool {
 	pa := a.(*PeerTracker)
 	pb := b.(*PeerTracker)
 
-	// having no tasks means lowest priority
-	// having both of these checks ensures stability of the sort
-	if pa.numTasks == 0 {
+	// having no pending tasks means lowest priority
+	paPending := len(pa.pendingTasks)
+	pbPending := len(pb.pendingTasks)
+	if paPending == 0 {
 		return false
 	}
-	if pb.numTasks == 0 {
+	if pbPending == 0 {
 		return true
 	}
 
@@ -69,52 +68,16 @@ func PeerCompare(a, b pq.Elem) bool {
 		return true
 	}
 
-	// having no pending tasks means lowest priority
-	if pa.taskQueue.Len() == 0 {
-		return false
-	}
-	if pb.taskQueue.Len() == 0 {
-		return true
+	// If each peer has an equal amount of active data in its queue, choose the
+	// peer with the most amount of data waiting to send out
+	if pa.activeBytes == pb.activeBytes {
+		return paPending > pbPending
 	}
 
 	// Choose the peer with the least amount of active data in its queue.
 	// This way we "keep peers busy" by sending them as much data as they can
 	// process.
 	return pa.activeBytes < pb.activeBytes
-}
-
-// startTask signals that a task was started for this peer.
-func (p *PeerTracker) startTask(identifier peertask.Identifier, isWantBlock bool) {
-	p.activelk.Lock()
-	defer p.activelk.Unlock()
-
-	taskId := p.getTaskId(identifier, isWantBlock)
-	p.activeTasks[taskId] = struct{}{}
-	task, ok := p.taskMap[taskId]
-	if !ok {
-		panic(fmt.Sprintf("Active task %s not found in task map", taskId))
-	}
-	p.activeBytes += task.Size
-}
-
-// TaskDone signals that a task was completed for this peer.
-func (p *PeerTracker) TaskDone(identifier peertask.Identifier, isWantBlock bool) {
-	p.activelk.Lock()
-	defer p.activelk.Unlock()
-
-	taskId := p.getTaskId(identifier, isWantBlock)
-	delete(p.activeTasks, taskId)
-
-	task, ok := p.taskMap[taskId]
-	if ok && !task.Removed {
-		delete(p.taskMap, taskId)
-		p.numTasks--
-
-		p.activeBytes -= task.Size
-		if p.activeBytes < 0 {
-			panic("more tasks finished than started!")
-		}
-	}
 }
 
 // Target returns the peer that this peer tracker tracks tasks for
@@ -127,7 +90,7 @@ func (p *PeerTracker) IsIdle() bool {
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
 
-	return p.numTasks == 0 && p.activeBytes == 0
+	return len(p.pendingTasks) == 0 && len(p.activeTasks) == 0
 }
 
 // Index implements pq.Elem.
@@ -160,7 +123,7 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 			if isActiveTaskAWantBlock || !task.IsWantBlock {
 				continue
 			}
-		} else if existingTask, ok := p.anyQueuedTaskWithIdentifier(task.Identifier); ok {
+		} else if existingTask, ok := p.anyPendingTaskWithIdentifier(task.Identifier); ok {
 			// There is already a task with this Identifier, and the task is not active
 
 			// If the new task has a higher priority than the old task,
@@ -184,8 +147,8 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 
 				// Update the mapping from task id -> task
 				if taskId != existingTaskId {
-					delete(p.taskMap, existingTaskId)
-					p.taskMap[taskId] = existingTask
+					delete(p.pendingTasks, existingTaskId)
+					p.pendingTasks[taskId] = existingTask
 				}
 			}
 
@@ -195,8 +158,8 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 		}
 
 		// Push the new task onto the queue
-		p.taskMap[taskId] = qTask
-		p.numTasks++
+		p.pendingTasks[taskId] = qTask
+		// p.numTasks++
 		p.taskQueue.Push(qTask)
 	}
 }
@@ -208,9 +171,9 @@ func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 		// Pop a task off the queue
 		task := p.taskQueue.Pop().(*peertask.QueueTask)
 
-		// If it's been pruned, skip it
-		if task.Removed {
-			delete(p.taskMap, p.getTaskId(task.Identifier, task.IsWantBlock))
+		// Ignore tasks that have been cancelled
+		taskId := p.getTaskId(task.Identifier, task.IsWantBlock)
+		if _, ok := p.pendingTasks[taskId]; !ok {
 			continue
 		}
 
@@ -220,6 +183,8 @@ func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 			// queue.
 			p.taskQueue.Push(task)
 
+			// We have as many tasks as we can fit into the message, so return
+			// the tasks
 			return out
 		}
 
@@ -227,10 +192,42 @@ func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 		size = size + task.Size
 
 		// Start the task (this makes it "active")
-		p.startTask(task.Identifier, task.IsWantBlock)
+		p.startTask(task)
 	}
 
 	return out
+}
+
+// startTask signals that a task was started for this peer.
+func (p *PeerTracker) startTask(task *peertask.QueueTask) {
+	p.activelk.Lock()
+	defer p.activelk.Unlock()
+
+	// Remove task from pending queue
+	taskId := p.getTaskId(task.Identifier, task.IsWantBlock)
+	delete(p.pendingTasks, taskId)
+
+	// Add task to active queue
+	if _, ok := p.activeTasks[taskId]; !ok {
+		p.activeTasks[taskId] = task.Size
+		p.activeBytes += task.Size
+	}
+}
+
+// TaskDone signals that a task was completed for this peer.
+func (p *PeerTracker) TaskDone(identifier peertask.Identifier, isWantBlock bool) {
+	p.activelk.Lock()
+	defer p.activelk.Unlock()
+
+	// Remove task from active queue
+	taskId := p.getTaskId(identifier, isWantBlock)
+	if size, ok := p.activeTasks[taskId]; ok {
+		delete(p.activeTasks, taskId)
+		p.activeBytes -= size
+		if p.activeBytes < 0 {
+			panic("more tasks finished than started!")
+		}
+	}
 }
 
 // Remove removes the task with the given identifier from this peer's queue
@@ -240,13 +237,9 @@ func (p *PeerTracker) Remove(identifier peertask.Identifier) bool {
 
 func (p *PeerTracker) remove(identifier peertask.Identifier, isWantBlock bool) bool {
 	taskId := p.getTaskId(identifier, isWantBlock)
-	task, ok := p.taskMap[taskId]
-	if ok && !task.Removed {
-		// Note that we don't actually remove the reference from p.taskMap
-		// because the task is still in p.taskQueue. It will eventually get
-		// popped off the queue and cleaned up (in PopTasks())
-		task.Removed = true
-		p.numTasks--
+	_, ok := p.pendingTasks[taskId]
+	if ok {
+		delete(p.pendingTasks, taskId)
 	}
 	return ok
 }
@@ -296,15 +289,15 @@ func (p *PeerTracker) isAnyTaskWithIdentifierActive(identifier peertask.Identifi
 	return false, false
 }
 
-// anyQueuedTaskWithIdentifier returns a queued task with the given identifier.
-func (p *PeerTracker) anyQueuedTaskWithIdentifier(identifier peertask.Identifier) (*peertask.QueueTask, bool) {
+// anyPendingTaskWithIdentifier returns a queued task with the given identifier.
+func (p *PeerTracker) anyPendingTaskWithIdentifier(identifier peertask.Identifier) (*peertask.QueueTask, bool) {
 	taskIdBlock := p.getTaskId(identifier, true)
-	if taskBlock, ok := p.taskMap[taskIdBlock]; ok {
+	if taskBlock, ok := p.pendingTasks[taskIdBlock]; ok {
 		return taskBlock, true
 	}
 
 	taskIdNotBlock := p.getTaskId(identifier, false)
-	if taskNotBlock, ok := p.taskMap[taskIdNotBlock]; ok {
+	if taskNotBlock, ok := p.pendingTasks[taskIdNotBlock]; ok {
 		return taskNotBlock, true
 	}
 	return nil, false
