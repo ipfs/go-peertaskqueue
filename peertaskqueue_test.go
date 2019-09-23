@@ -136,7 +136,7 @@ func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
 	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
 }
 
-// This test checks that peers wont starve out other peers
+// This test checks that ordering of peers is correct
 func TestPeerOrder(t *testing.T) {
 	ptq := New()
 	peers := testutil.GeneratePeers(3)
@@ -211,6 +211,70 @@ func TestPeerOrder(t *testing.T) {
 	// a: 3 + 1 + 2
 	// b: 1 + 3 + 1
 	// c: 2 + 2
+	// No more pending tasks, so next pop should return nothing
+	p, tsk = ptq.PopTasks("", 3)
+	if len(tsk) != 0 {
+		t.Fatal("Expected no more tasks")
+	}
+}
+
+// This test checks that we can pop multiple times from the same peer
+func TestPopSamePeer(t *testing.T) {
+	ptq := New()
+	peers := testutil.GeneratePeers(2)
+	a := peers[0]
+	b := peers[1]
+
+	ptq.PushTasks(a, peertask.Task{Identifier: "1", Size: 3, Priority: 2})
+	ptq.PushTasks(a, peertask.Task{Identifier: "2", Size: 1, Priority: 1})
+
+	ptq.PushTasks(b, peertask.Task{Identifier: "3", Size: 1, Priority: 2})
+	ptq.PushTasks(b, peertask.Task{Identifier: "4", Size: 3, Priority: 1})
+
+	// Neither peers has anything in its active queue, so equal chance of any
+	// peer being chosen
+	var ps []string
+	var ids []string
+	for i := 0; i < 2; i++ {
+		p, tasks := ptq.PopTasks("", 3)
+		ps = append(ps, p.String())
+		ids = append(ids, fmt.Sprint(tasks[0].Identifier))
+	}
+	matchArrays(t, ps, []string{a.String(), b.String()})
+	matchArrays(t, ids, []string{"1", "3"})
+
+	// Active queues:
+	// a: 3            Pending: [1]
+	// b: 1            Pending: [3]
+	// Peer b has smallest active byte size in its queue, so it would be chosen
+	// but we explicitly request peer a
+	p, tsk := ptq.PopTasks(a, 3)
+	if len(tsk) != 1 || p != a || tsk[0].Identifier != "2" {
+		t.Fatal("Expected ID 2 from peer a", tsk)
+	}
+
+	// Active queues:
+	// a: 3 + 1
+	// b: 1            Pending: [3]
+	// Peer b has smallest active byte size in its queue, so it would be chosen
+	// but we explicitly request peer a again
+	p, tsk = ptq.PopTasks(a, 3)
+	if len(tsk) != 0 {
+		t.Fatal("Expected no tasks (request for peer a tasks)")
+	}
+
+	// Active queues:
+	// a: 3 + 1
+	// b: 1            Pending: [3]
+	// Now we dont request a specific peer, expect peer b
+	p, tsk = ptq.PopTasks("", 3)
+	if len(tsk) != 1 || p != b || tsk[0].Identifier != "4" {
+		t.Fatal("Expected ID 4 from peer b")
+	}
+
+	// Active queues:
+	// a: 3 + 1
+	// b: 1 + 3
 	// No more pending tasks, so next pop should return nothing
 	p, tsk = ptq.PopTasks("", 3)
 	if len(tsk) != 0 {
@@ -319,8 +383,8 @@ func matchArrays(t *testing.T, str1, str2 []string) {
 	sort.Strings(str1)
 	sort.Strings(str2)
 
-	t.Log(str2)
 	t.Log(str1)
+	t.Log(str2)
 	for i, s := range str2 {
 		if str1[i] != s {
 			t.Fatal("unexpected peer", s, str1[i])

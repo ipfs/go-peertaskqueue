@@ -151,7 +151,8 @@ func (ptq *PeerTaskQueue) PopTasks(from peer.ID, maxSize int) (peer.ID, []peerta
 	var peerTracker *peertracker.PeerTracker
 
 	// If the peer wasn't specified, choose the highest priority peer
-	if from == "" {
+	popTracker := from == ""
+	if popTracker {
 		peerTracker = ptq.pQueue.Pop().(*peertracker.PeerTracker)
 		if peerTracker == nil {
 			return "", nil
@@ -174,10 +175,12 @@ func (ptq *PeerTaskQueue) PopTasks(from peer.ID, maxSize int) (peer.ID, []peerta
 		delete(ptq.peerTrackers, target)
 		delete(ptq.frozenPeers, target)
 		ptq.callHooks(target, peerRemoved)
-	} else {
-		// If it does have more tasks, put it back into the peer queue
+	} else if popTracker {
+		// If it does have more tasks, and we popped it, put it back into the
+		// peer queue
 		ptq.pQueue.Push(peerTracker)
 	}
+
 	return peerTracker.Target(), out
 }
 
