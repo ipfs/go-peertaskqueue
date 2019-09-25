@@ -166,7 +166,6 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 
 		// Push the new task onto the queue
 		p.pendingTasks[taskId] = qTask
-		// p.numTasks++
 		p.taskQueue.Push(qTask)
 	}
 }
