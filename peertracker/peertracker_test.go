@@ -380,6 +380,122 @@ func TestPushHaveVsBlockActive(t *testing.T) {
 	runTestCase([]peertask.Task{wantHave, wantBlock}, 2)
 }
 
+func TestPushSizeInfoActive(t *testing.T) {
+	partner := testutil.GeneratePeers(1)[0]
+
+	wantBlock := peertask.Task{
+		Identifier:   "1",
+		Priority:     10,
+		IsWantBlock:  true,
+		IsDontHave:   false,
+		SendDontHave: false,
+		Size:         10,
+	}
+	wantBlockDontHave := peertask.Task{
+		Identifier:   "1",
+		Priority:     10,
+		IsWantBlock:  true,
+		IsDontHave:   true,
+		SendDontHave: false,
+		Size:         10,
+	}
+	wantHave := peertask.Task{
+		Identifier:   "1",
+		Priority:     10,
+		IsWantBlock:  false,
+		IsDontHave:   false,
+		SendDontHave: false,
+		Size:         10,
+	}
+	wantHaveDontHave := peertask.Task{
+		Identifier:   "1",
+		Priority:     10,
+		IsWantBlock:  false,
+		IsDontHave:   true,
+		SendDontHave: false,
+		Size:         10,
+	}
+
+	runTestCase := func(tasks []peertask.Task, expCount int) {
+		tracker := New(partner)
+		var popped []peertask.Task
+		for _, task := range tasks {
+			// Push the task
+			tracker.PushTasks([]peertask.Task{task})
+			// Pop the task (which makes it active)
+			popped = append(popped, tracker.PopTasks(20)...)
+		}
+		if len(popped) != expCount {
+			t.Fatalf("Expected %d tasks, received %d tasks", expCount, len(popped))
+		}
+	}
+
+	// want-block with size should be added if there is existing want-block (DONT_HAVE)
+	runTestCase([]peertask.Task{wantBlockDontHave, wantBlock}, 2)
+	// want-block (DONT_HAVE) should not be added if there is existing want-block with size
+	runTestCase([]peertask.Task{wantBlock, wantBlockDontHave}, 1)
+	// want-block (DONT_HAVE) should not be added if there is existing want-block (DONT_HAVE)
+	runTestCase([]peertask.Task{wantBlockDontHave, wantBlockDontHave}, 1)
+	// want-have with size should be added if there is existing want-have (DONT_HAVE)
+	runTestCase([]peertask.Task{wantHaveDontHave, wantHave}, 2)
+	// want-have (DONT_HAVE) should not be added if there is existing want-have with size
+	runTestCase([]peertask.Task{wantHave, wantHaveDontHave}, 1)
+	// want-have (DONT_HAVE) should not be added if there is existing want-have (DONT_HAVE)
+	runTestCase([]peertask.Task{wantHaveDontHave, wantHaveDontHave}, 1)
+}
+
+func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
+	partner := testutil.GeneratePeers(1)[0]
+
+	wantBlock := peertask.Task{
+		Identifier:   "1",
+		Priority:     10,
+		IsWantBlock:  true,
+		IsDontHave:   false,
+		SendDontHave: false,
+		Size:         10,
+	}
+	wantHave := peertask.Task{
+		Identifier:   "1",
+		Priority:     10,
+		IsWantBlock:  false,
+		IsDontHave:   false,
+		SendDontHave: false,
+		Size:         10,
+	}
+	wantHaveDontHave := peertask.Task{
+		Identifier:   "1",
+		Priority:     10,
+		IsWantBlock:  false,
+		IsDontHave:   true,
+		SendDontHave: false,
+		Size:         10,
+	}
+
+	tracker := New(partner)
+
+	// Push a want-have (DONT_HAVE)
+	tracker.PushTasks([]peertask.Task{wantHaveDontHave})
+
+	// Pop the want-have (DONT_HAVE) (which makes it active)
+	popped := tracker.PopTasks(20)
+
+	// Push a second want-have (with a size). Should be added to the pending
+	// queue.
+	tracker.PushTasks([]peertask.Task{wantHave})
+
+	// Push a want-block (should replace the pending want-have)
+	tracker.PushTasks([]peertask.Task{wantBlock})
+
+	popped = tracker.PopTasks(20)
+	if len(popped) != 1 {
+		t.Fatalf("Expected 1 task to be popped, received %d tasks", len(popped))
+	}
+	if !popped[0].IsWantBlock {
+		t.Fatalf("Expected task to be want-block")
+	}
+}
+
 func TestTaskDone(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 
