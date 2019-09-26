@@ -1,7 +1,6 @@
 package peertracker
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
