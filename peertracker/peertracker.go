@@ -8,6 +8,8 @@ import (
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+
+	"github.com/google/uuid"
 )
 
 // PeerTracker tracks task blocks for a single peer, as well as active tasks
@@ -16,9 +18,9 @@ type PeerTracker struct {
 	target peer.ID
 
 	// Tasks that are pending being made active
-	pendingTasks map[string]*peertask.QueueTask
+	pendingTasks map[peertask.Identifier]*peertask.QueueTask
 	// Tasks that have been made active
-	activeTasks map[string]*peertask.QueueTask
+	activeTasks map[uuid.UUID]*peertask.QueueTask
 
 	// activeBytes must be locked around as it will be updated externally
 	activelk    sync.Mutex
@@ -38,8 +40,8 @@ func New(target peer.ID) *PeerTracker {
 	return &PeerTracker{
 		target:       target,
 		taskQueue:    pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
-		pendingTasks: make(map[string]*peertask.QueueTask),
-		activeTasks:  make(map[string]*peertask.QueueTask),
+		pendingTasks: make(map[peertask.Identifier]*peertask.QueueTask),
+		activeTasks:  make(map[uuid.UUID]*peertask.QueueTask),
 	}
 }
 
@@ -111,27 +113,15 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 
 	for _, task := range tasks {
 		qTask := peertask.NewQueueTask(task, p.target, now)
-		taskId := p.getTaskId(task.Identifier, task.IsWantBlock)
 
-		// If the task is currently active (being processed)
-		if existingTask, ok := p.anyActiveTaskWithIdentifier(task.Identifier); ok {
-			// We can replace a want-have with a want-block
-			replaceHaveWithBlock := !existingTask.IsWantBlock && task.IsWantBlock
-			// We can replace a DONT_HAVE with a HAVE or a block
-			replaceDontHave := existingTask.IsDontHave && !task.IsDontHave
-
-			// We can only replace tasks that are not active.
-			// If the active task could not have been replaced (even if it
-			// wasn't active) by the new task, that means the new task is
-			// not doing anything useful, so skip adding the new task.
-			canReplace := replaceHaveWithBlock || replaceDontHave
-			if !canReplace {
-				continue
-			}
+		// If the new task doesn't add any more information over what we
+		// already have in the active queue, then we can skip the new task
+		if !p.taskHasMoreInfoThanActiveTasks(task) {
+			continue
 		}
 
 		// If there is already a non-active task with this Identifier
-		if existingTask, ok := p.anyPendingTaskWithIdentifier(task.Identifier); ok {
+		if existingTask, ok := p.pendingTasks[task.Identifier]; ok {
 			// If the new task has a higher priority than the old task,
 			if task.Priority > existingTask.Priority {
 				// Update the priority and the task's position in the queue
@@ -147,16 +137,8 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 
 			// We can replace a want-have with a want-block
 			if !existingTask.IsWantBlock && task.IsWantBlock {
-				existingTaskId := p.getTaskId(existingTask.Identifier, existingTask.IsWantBlock)
-
 				// Update the tasks's fields
 				existingTask.ReplaceWith(qTask)
-
-				// Update the mapping from task id -> task
-				if taskId != existingTaskId {
-					delete(p.pendingTasks, existingTaskId)
-					p.pendingTasks[taskId] = existingTask
-				}
 			}
 
 			// A task with the Identifier exists, so we don't need to add
@@ -165,7 +147,7 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 		}
 
 		// Push the new task onto the queue
-		p.pendingTasks[taskId] = qTask
+		p.pendingTasks[task.Identifier] = qTask
 		p.taskQueue.Push(qTask)
 	}
 }
@@ -178,8 +160,7 @@ func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 		task := p.taskQueue.Pop().(*peertask.QueueTask)
 
 		// Ignore tasks that have been cancelled
-		taskId := p.getTaskId(task.Identifier, task.IsWantBlock)
-		if _, ok := p.pendingTasks[taskId]; !ok {
+		if _, ok := p.pendingTasks[task.Identifier]; !ok {
 			continue
 		}
 
@@ -194,11 +175,11 @@ func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 			return out
 		}
 
-		out = append(out, task.Task)
-		size = size + task.Size
-
 		// Start the task (this makes it "active")
 		p.startTask(task)
+
+		out = append(out, task.Task)
+		size = size + task.Size
 	}
 
 	return out
@@ -210,25 +191,24 @@ func (p *PeerTracker) startTask(task *peertask.QueueTask) {
 	defer p.activelk.Unlock()
 
 	// Remove task from pending queue
-	taskId := p.getTaskId(task.Identifier, task.IsWantBlock)
-	delete(p.pendingTasks, taskId)
+	delete(p.pendingTasks, task.Identifier)
 
 	// Add task to active queue
-	if _, ok := p.activeTasks[taskId]; !ok {
-		p.activeTasks[taskId] = task
+	task.Uuid = uuid.New()
+	if _, ok := p.activeTasks[task.Uuid]; !ok {
+		p.activeTasks[task.Uuid] = task
 		p.activeBytes += task.Size
 	}
 }
 
 // TaskDone signals that a task was completed for this peer.
-func (p *PeerTracker) TaskDone(identifier peertask.Identifier, isWantBlock bool) {
+func (p *PeerTracker) TaskDone(task peertask.Task) {
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
 
 	// Remove task from active queue
-	taskId := p.getTaskId(identifier, isWantBlock)
-	if task, ok := p.activeTasks[taskId]; ok {
-		delete(p.activeTasks, taskId)
+	if task, ok := p.activeTasks[task.Uuid]; ok {
+		delete(p.activeTasks, task.Uuid)
 		p.activeBytes -= task.Size
 		if p.activeBytes < 0 {
 			panic("more tasks finished than started!")
@@ -242,10 +222,9 @@ func (p *PeerTracker) Remove(identifier peertask.Identifier) bool {
 }
 
 func (p *PeerTracker) remove(identifier peertask.Identifier, isWantBlock bool) bool {
-	taskId := p.getTaskId(identifier, isWantBlock)
-	_, ok := p.pendingTasks[taskId]
+	_, ok := p.pendingTasks[identifier]
 	if ok {
-		delete(p.pendingTasks, taskId)
+		delete(p.pendingTasks, identifier)
 	}
 	return ok
 }
@@ -273,35 +252,40 @@ func (p *PeerTracker) IsFrozen() bool {
 	return p.freezeVal > 0
 }
 
-// getTaskId gets the task id for a task with the given identifier, of the given type.
-func (p *PeerTracker) getTaskId(identifier peertask.Identifier, isWantBlock bool) string {
-	return fmt.Sprintf("%s-%t", identifier, isWantBlock)
-}
+func (p *PeerTracker) taskHasMoreInfoThanActiveTasks(task peertask.Task) bool {
+	taskWithIdExists := false
+	haveSize := false
+	haveBlock := false
+	for _, at := range p.activeTasks {
+		if task.Identifier == at.Identifier {
+			taskWithIdExists = true
 
-// anyActiveTaskWithIdentifier returns an active task with the given identifier.
-func (p *PeerTracker) anyActiveTaskWithIdentifier(identifier peertask.Identifier) (*peertask.QueueTask, bool) {
-	taskIdBlock := p.getTaskId(identifier, true)
-	if taskBlock, ok := p.activeTasks[taskIdBlock]; ok {
-		return taskBlock, true
+			if !at.IsDontHave {
+				haveSize = true
+			}
+
+			if at.IsWantBlock {
+				haveBlock = true
+			}
+		}
 	}
 
-	taskIdNotBlock := p.getTaskId(identifier, false)
-	if taskNotBlock, ok := p.activeTasks[taskIdNotBlock]; ok {
-		return taskNotBlock, true
-	}
-	return nil, false
-}
-
-// anyPendingTaskWithIdentifier returns a queued task with the given identifier.
-func (p *PeerTracker) anyPendingTaskWithIdentifier(identifier peertask.Identifier) (*peertask.QueueTask, bool) {
-	taskIdBlock := p.getTaskId(identifier, true)
-	if taskBlock, ok := p.pendingTasks[taskIdBlock]; ok {
-		return taskBlock, true
+	// No existing task with that id, so the new task has more info
+	if !taskWithIdExists {
+		return true
 	}
 
-	taskIdNotBlock := p.getTaskId(identifier, false)
-	if taskNotBlock, ok := p.pendingTasks[taskIdNotBlock]; ok {
-		return taskNotBlock, true
+	// If there is no active want-block and the new task is a want-block,
+	// the new task is better
+	if !haveBlock && task.IsWantBlock {
+		return true
 	}
-	return nil, false
+
+	// If there is no size information for the CID and the new task has
+	// size information, the new task is better
+	if !haveSize && !task.IsDontHave {
+		return true
+	}
+
+	return false
 }

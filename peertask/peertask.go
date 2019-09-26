@@ -5,6 +5,8 @@ import (
 
 	pq "github.com/ipfs/go-ipfs-pq"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+
+	"github.com/google/uuid"
 )
 
 // FIFOCompare is a basic task comparator that returns tasks in the order created.
@@ -41,6 +43,7 @@ type Task struct {
 	IsDontHave   bool
 	SendDontHave bool
 	Size         int
+	Uuid         uuid.UUID
 }
 
 // QueueTask contains a Task, and also some bookkeeping information.

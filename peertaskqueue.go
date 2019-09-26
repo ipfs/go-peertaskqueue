@@ -198,7 +198,7 @@ func (ptq *PeerTaskQueue) TasksDone(to peer.ID, tasks ...peertask.Task) {
 
 	// Tell the peer tracker that the tasks have completed
 	for _, task := range tasks {
-		peerTracker.TaskDone(task.Identifier, task.IsWantBlock)
+		peerTracker.TaskDone(task)
 	}
 
 	// This may affect the peer's position in the peer queue, so update if

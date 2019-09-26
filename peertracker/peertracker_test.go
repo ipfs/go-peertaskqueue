@@ -527,7 +527,7 @@ func TestTaskDone(t *testing.T) {
 			if len(poppedTask) > 0 {
 				popped = append(popped, poppedTask...)
 				// Complete the task (which makes it inactive)
-				tracker.TaskDone(poppedTask[0].Identifier, poppedTask[0].IsWantBlock)
+				tracker.TaskDone(poppedTask[0])
 			}
 		}
 		if len(popped) != expCount {
