@@ -22,12 +22,12 @@ func TestPushPop(t *testing.T) {
 
 	tasks := []peertask.Task{
 		peertask.Task{
-			Identifier:   "1",
-			Priority:     1,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "1",
+			Priority:      1,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 	}
 	tracker.PushTasks(tasks)
@@ -46,28 +46,28 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 
 	tasks := []peertask.Task{
 		peertask.Task{
-			Identifier:   "1",
-			Priority:     10,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "1",
+			Priority:      10,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "2",
-			Priority:     20,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "2",
+			Priority:      20,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "3",
-			Priority:     15,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "3",
+			Priority:      15,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 	}
 	tracker.PushTasks(tasks)
@@ -104,28 +104,28 @@ func TestRemove(t *testing.T) {
 
 	tasks := []peertask.Task{
 		peertask.Task{
-			Identifier:   "1",
-			Priority:     10,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "1",
+			Priority:      10,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "2",
-			Priority:     20,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "2",
+			Priority:      20,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "3",
-			Priority:     15,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "3",
+			Priority:      15,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 	}
 	tracker.PushTasks(tasks)
@@ -145,28 +145,28 @@ func TestRemoveMulti(t *testing.T) {
 
 	tasks := []peertask.Task{
 		peertask.Task{
-			Identifier:   "1",
-			Priority:     10,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "1",
+			Priority:      10,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "1",
-			Priority:     20,
-			IsWantBlock:  false,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "1",
+			Priority:      20,
+			IsWantBlock:   false,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "2",
-			Priority:     15,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "2",
+			Priority:      15,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 	}
 	tracker.PushTasks(tasks)
@@ -186,28 +186,28 @@ func TestRemoveActive(t *testing.T) {
 
 	tasks := []peertask.Task{
 		peertask.Task{
-			Identifier:   "1",
-			Priority:     10,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "1",
+			Priority:      10,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "1",
-			Priority:     20,
-			IsWantBlock:  false,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "1",
+			Priority:      20,
+			IsWantBlock:   false,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 		peertask.Task{
-			Identifier:   "2",
-			Priority:     15,
-			IsWantBlock:  true,
-			IsDontHave:   false,
-			SendDontHave: false,
-			Size:         10,
+			Identifier:    "2",
+			Priority:      15,
+			IsWantBlock:   true,
+			KnowBlockSize: true,
+			SendDontHave:  false,
+			Size:          10,
 		},
 	}
 
@@ -238,20 +238,20 @@ func TestPushHaveVsBlock(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 
 	wantHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantBlock := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 
 	runTestCase := func(tasks []peertask.Task, expIsWantBlock bool) {
@@ -282,36 +282,36 @@ func TestPushSizeInfo(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 
 	wantBlock := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         20,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          20,
 	}
 	wantBlockDontHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   true,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: false,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         30,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          30,
 	}
 	wantHaveDontHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   true,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: false,
+		SendDontHave:  false,
+		Size:          10,
 	}
 
 	runTestCase := func(tasks []peertask.Task, expSize int) {
@@ -340,20 +340,20 @@ func TestPushHaveVsBlockActive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 
 	wantHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantBlock := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 
 	runTestCase := func(tasks []peertask.Task, expCount int) {
@@ -384,36 +384,36 @@ func TestPushSizeInfoActive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 
 	wantBlock := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantBlockDontHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   true,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: false,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantHaveDontHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   true,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: false,
+		SendDontHave:  false,
+		Size:          10,
 	}
 
 	runTestCase := func(tasks []peertask.Task, expCount int) {
@@ -448,28 +448,28 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 
 	wantBlock := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantHaveDontHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   true,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: false,
+		SendDontHave:  false,
+		Size:          10,
 	}
 
 	tracker := New(partner)
@@ -500,20 +500,20 @@ func TestTaskDone(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 
 	wantHave := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  false,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   false,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 	wantBlock := peertask.Task{
-		Identifier:   "1",
-		Priority:     10,
-		IsWantBlock:  true,
-		IsDontHave:   false,
-		SendDontHave: false,
-		Size:         10,
+		Identifier:    "1",
+		Priority:      10,
+		IsWantBlock:   true,
+		KnowBlockSize: true,
+		SendDontHave:  false,
+		Size:          10,
 	}
 
 	runTestCase := func(tasks []peertask.Task, expCount int) {

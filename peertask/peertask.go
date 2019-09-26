@@ -37,13 +37,13 @@ type Identifier interface{}
 
 // Task is a single task to be executed as part of a task block.
 type Task struct {
-	Identifier   Identifier
-	Priority     int
-	IsWantBlock  bool
-	IsDontHave   bool
-	SendDontHave bool
-	Size         int
-	Uuid         uuid.UUID
+	Identifier    Identifier
+	Priority      int
+	IsWantBlock   bool
+	KnowBlockSize bool
+	SendDontHave  bool
+	Size          int
+	Uuid          uuid.UUID
 }
 
 // QueueTask contains a Task, and also some bookkeeping information.
@@ -60,7 +60,7 @@ func (t *QueueTask) ReplaceWith(replacement *QueueTask) {
 	t.Priority = replacement.Priority
 	t.IsWantBlock = replacement.IsWantBlock
 	t.SendDontHave = replacement.SendDontHave
-	t.IsDontHave = replacement.IsDontHave
+	t.KnowBlockSize = replacement.KnowBlockSize
 	t.Size = replacement.Size
 }
 
