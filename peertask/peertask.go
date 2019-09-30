@@ -37,13 +37,13 @@ type Identifier interface{}
 
 // Task is a single task to be executed as part of a task block.
 type Task struct {
-	Identifier    Identifier
-	Priority      int
-	IsWantBlock   bool
-	KnowBlockSize bool
-	SendDontHave  bool
-	Size          int
-	Uuid          uuid.UUID
+	Identifier   Identifier
+	Priority     int
+	IsWantBlock  bool
+	SendDontHave bool
+	EntrySize    int
+	BlockSize    int
+	Uuid         uuid.UUID
 }
 
 // QueueTask contains a Task, and also some bookkeeping information.
@@ -55,22 +55,15 @@ type QueueTask struct {
 	index   int       // book-keeping field used by the pq container
 }
 
-// ReplaceWith copies the fields from the given QueueTask into this QueueTask.
-func (t *QueueTask) ReplaceWith(replacement *QueueTask) {
-	t.Priority = replacement.Priority
-	t.IsWantBlock = replacement.IsWantBlock
-	t.SendDontHave = replacement.SendDontHave
-	t.KnowBlockSize = replacement.KnowBlockSize
-	t.Size = replacement.Size
-}
-
 // NewQueueTask creates a new QueueTask from the given Task.
 func NewQueueTask(task Task, target peer.ID, created time.Time) *QueueTask {
-	return &QueueTask{
+	t := &QueueTask{
 		Task:    task,
 		Target:  target,
 		created: created,
 	}
+	t.Uuid = uuid.New()
+	return t
 }
 
 // Index implements pq.Elem.

@@ -111,8 +111,6 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 	defer p.activelk.Unlock()
 
 	for _, task := range tasks {
-		qTask := peertask.NewQueueTask(task, p.target, now)
-
 		// If the new task doesn't add any more information over what we
 		// already have in the active queue, then we can skip the new task
 		if !p.taskHasMoreInfoThanActiveTasks(task) {
@@ -128,16 +126,27 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 				p.taskQueue.Update(existingTask.Index())
 			}
 
-			// If we now know the size of the block, update the existing entry
-			if !existingTask.KnowBlockSize && task.KnowBlockSize {
-				existingTask.Size = task.Size
-				existingTask.KnowBlockSize = true
+			// If we now have block size information, update the task with
+			// the new block size
+			if existingTask.BlockSize == 0 && task.BlockSize > 0 {
+				existingTask.BlockSize = task.BlockSize
 			}
 
-			// We can replace a want-have with a want-block
+			// If replacing a want-have with a want-block
 			if !existingTask.IsWantBlock && task.IsWantBlock {
-				// Update the tasks's fields
-				existingTask.ReplaceWith(qTask)
+				// Change the type from want-have to want-block
+				existingTask.IsWantBlock = true
+				// If the want-have was a DONT_HAVE, or the want-block has a size
+				if existingTask.BlockSize == 0 || task.BlockSize > 0 {
+					// Update the entry size
+					existingTask.EntrySize = task.EntrySize
+				}
+			}
+
+			// If the task is a want-block, make sure the entry size is equal
+			// to the block size
+			if existingTask.IsWantBlock && existingTask.BlockSize > 0 {
+				existingTask.EntrySize = existingTask.BlockSize
 			}
 
 			// A task with the Identifier exists, so we don't need to add
@@ -146,6 +155,7 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 		}
 
 		// Push the new task onto the queue
+		qTask := peertask.NewQueueTask(task, p.target, now)
 		p.pendingTasks[task.Identifier] = qTask
 		p.taskQueue.Push(qTask)
 	}
@@ -156,15 +166,16 @@ func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 	size := 0
 	for p.taskQueue.Len() > 0 && p.freezeVal == 0 {
 		// Pop a task off the queue
-		task := p.taskQueue.Pop().(*peertask.QueueTask)
+		t := p.taskQueue.Pop().(*peertask.QueueTask)
 
 		// Ignore tasks that have been cancelled
-		if _, ok := p.pendingTasks[task.Identifier]; !ok {
+		task, ok := p.pendingTasks[t.Identifier]
+		if !ok {
 			continue
 		}
 
 		// If the next task is too big for the message
-		if size+task.Size > maxSize {
+		if size+task.EntrySize > maxSize {
 			// This task doesn't fit into the message, so push it back onto the
 			// queue.
 			p.taskQueue.Push(task)
@@ -178,7 +189,7 @@ func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 		p.startTask(task)
 
 		out = append(out, task.Task)
-		size = size + task.Size
+		size = size + task.EntrySize
 	}
 
 	return out
@@ -193,10 +204,9 @@ func (p *PeerTracker) startTask(task *peertask.QueueTask) {
 	delete(p.pendingTasks, task.Identifier)
 
 	// Add task to active queue
-	task.Uuid = uuid.New()
 	if _, ok := p.activeTasks[task.Uuid]; !ok {
 		p.activeTasks[task.Uuid] = task
-		p.activeBytes += task.Size
+		p.activeBytes += task.EntrySize
 	}
 }
 
@@ -208,7 +218,7 @@ func (p *PeerTracker) TaskDone(task peertask.Task) {
 	// Remove task from active queue
 	if task, ok := p.activeTasks[task.Uuid]; ok {
 		delete(p.activeTasks, task.Uuid)
-		p.activeBytes -= task.Size
+		p.activeBytes -= task.EntrySize
 		if p.activeBytes < 0 {
 			panic("more tasks finished than started!")
 		}
@@ -251,6 +261,8 @@ func (p *PeerTracker) IsFrozen() bool {
 	return p.freezeVal > 0
 }
 
+// Indicates whether the new task adds any more information over tasks that are
+// already in the active task queue
 func (p *PeerTracker) taskHasMoreInfoThanActiveTasks(task peertask.Task) bool {
 	taskWithIdExists := false
 	haveSize := false
@@ -259,7 +271,7 @@ func (p *PeerTracker) taskHasMoreInfoThanActiveTasks(task peertask.Task) bool {
 		if task.Identifier == at.Identifier {
 			taskWithIdExists = true
 
-			if at.KnowBlockSize {
+			if at.BlockSize > 0 {
 				haveSize = true
 			}
 
@@ -282,7 +294,7 @@ func (p *PeerTracker) taskHasMoreInfoThanActiveTasks(task peertask.Task) bool {
 
 	// If there is no size information for the CID and the new task has
 	// size information, the new task is better
-	if !haveSize && task.KnowBlockSize {
+	if !haveSize && task.BlockSize > 0 {
 		return true
 	}
 

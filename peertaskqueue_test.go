@@ -83,10 +83,10 @@ func TestFreezeUnfreeze(t *testing.T) {
 	// Push 5 blocks to each peer
 	for i := 0; i < 5; i++ {
 		is := fmt.Sprint(i)
-		ptq.PushTasks(a, peertask.Task{Identifier: is, Size: 1})
-		ptq.PushTasks(b, peertask.Task{Identifier: is, Size: 1})
-		ptq.PushTasks(c, peertask.Task{Identifier: is, Size: 1})
-		ptq.PushTasks(d, peertask.Task{Identifier: is, Size: 1})
+		ptq.PushTasks(a, peertask.Task{Identifier: is, EntrySize: 1})
+		ptq.PushTasks(b, peertask.Task{Identifier: is, EntrySize: 1})
+		ptq.PushTasks(c, peertask.Task{Identifier: is, EntrySize: 1})
+		ptq.PushTasks(d, peertask.Task{Identifier: is, EntrySize: 1})
 	}
 
 	// now, pop off four tasks, there should be one from each
@@ -121,10 +121,10 @@ func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		is := fmt.Sprint(i)
-		ptq.PushTasks(a, peertask.Task{Identifier: is, Size: 1})
-		ptq.PushTasks(b, peertask.Task{Identifier: is, Size: 1})
-		ptq.PushTasks(c, peertask.Task{Identifier: is, Size: 1})
-		ptq.PushTasks(d, peertask.Task{Identifier: is, Size: 1})
+		ptq.PushTasks(a, peertask.Task{Identifier: is, EntrySize: 1})
+		ptq.PushTasks(b, peertask.Task{Identifier: is, EntrySize: 1})
+		ptq.PushTasks(c, peertask.Task{Identifier: is, EntrySize: 1})
+		ptq.PushTasks(d, peertask.Task{Identifier: is, EntrySize: 1})
 	}
 
 	// now, pop off four tasks, there should be one from each
@@ -144,16 +144,16 @@ func TestPeerOrder(t *testing.T) {
 	b := peers[1]
 	c := peers[2]
 
-	ptq.PushTasks(a, peertask.Task{Identifier: "1", Size: 3, Priority: 3})
-	ptq.PushTasks(a, peertask.Task{Identifier: "2", Size: 1, Priority: 2})
-	ptq.PushTasks(a, peertask.Task{Identifier: "3", Size: 2, Priority: 1})
+	ptq.PushTasks(a, peertask.Task{Identifier: "1", EntrySize: 3, Priority: 3})
+	ptq.PushTasks(a, peertask.Task{Identifier: "2", EntrySize: 1, Priority: 2})
+	ptq.PushTasks(a, peertask.Task{Identifier: "3", EntrySize: 2, Priority: 1})
 
-	ptq.PushTasks(b, peertask.Task{Identifier: "4", Size: 1, Priority: 3})
-	ptq.PushTasks(b, peertask.Task{Identifier: "5", Size: 3, Priority: 2})
-	ptq.PushTasks(b, peertask.Task{Identifier: "6", Size: 1, Priority: 1})
+	ptq.PushTasks(b, peertask.Task{Identifier: "4", EntrySize: 1, Priority: 3})
+	ptq.PushTasks(b, peertask.Task{Identifier: "5", EntrySize: 3, Priority: 2})
+	ptq.PushTasks(b, peertask.Task{Identifier: "6", EntrySize: 1, Priority: 1})
 
-	ptq.PushTasks(c, peertask.Task{Identifier: "7", Size: 2, Priority: 3})
-	ptq.PushTasks(c, peertask.Task{Identifier: "8", Size: 2, Priority: 1})
+	ptq.PushTasks(c, peertask.Task{Identifier: "7", EntrySize: 2, Priority: 3})
+	ptq.PushTasks(c, peertask.Task{Identifier: "8", EntrySize: 2, Priority: 1})
 
 	// All peers have nothing in their active queue, so equal chance of any
 	// peer being chosen
@@ -225,11 +225,11 @@ func TestPopSamePeer(t *testing.T) {
 	a := peers[0]
 	b := peers[1]
 
-	ptq.PushTasks(a, peertask.Task{Identifier: "1", Size: 3, Priority: 2})
-	ptq.PushTasks(a, peertask.Task{Identifier: "2", Size: 1, Priority: 1})
+	ptq.PushTasks(a, peertask.Task{Identifier: "1", EntrySize: 3, Priority: 2})
+	ptq.PushTasks(a, peertask.Task{Identifier: "2", EntrySize: 1, Priority: 1})
 
-	ptq.PushTasks(b, peertask.Task{Identifier: "3", Size: 1, Priority: 2})
-	ptq.PushTasks(b, peertask.Task{Identifier: "4", Size: 3, Priority: 1})
+	ptq.PushTasks(b, peertask.Task{Identifier: "3", EntrySize: 1, Priority: 2})
+	ptq.PushTasks(b, peertask.Task{Identifier: "4", EntrySize: 3, Priority: 1})
 
 	// Neither peers has anything in its active queue, so equal chance of any
 	// peer being chosen
