@@ -163,6 +163,8 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 	}
 }
 
+// PopTasks pops as many tasks as possible up to the given size off the queue
+// in priority order
 func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
 	var out []peertask.Task
 	size := 0

@@ -37,14 +37,22 @@ type Identifier interface{}
 
 // Task is a single task to be executed as part of a task block.
 type Task struct {
-	Identifier   Identifier
-	Priority     int
-	IsWantBlock  bool
+	// Identifier for the task (may not be unique)
+	Identifier Identifier
+	// Priority of the task
+	Priority int
+	// Tasks can be want-have or want-block
+	IsWantBlock bool
+	// Whether to immediately send a response if the block is not found
 	SendDontHave bool
-	EntrySize    int
-	BlockSize    int
-	HaveBlock    bool
-	Uuid         uuid.UUID
+	// The size that this task will take up in the response message
+	EntrySize int
+	// The size of the block corresponding to the identifier
+	BlockSize int
+	// Whether the block was found
+	HaveBlock bool
+	// Unique ID
+	Uuid uuid.UUID
 }
 
 // QueueTask contains a Task, and also some bookkeeping information.
