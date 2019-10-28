@@ -26,6 +26,7 @@ func TestPushPop(t *testing.T) {
 			Priority:     1,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -50,6 +51,7 @@ func TestPopNegativeOrZeroSize(t *testing.T) {
 			Priority:     1,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -75,6 +77,7 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 			Priority:     10,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -83,6 +86,7 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 			Priority:     20,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -91,6 +95,7 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 			Priority:     15,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -133,6 +138,7 @@ func TestRemove(t *testing.T) {
 			Priority:     10,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -141,6 +147,7 @@ func TestRemove(t *testing.T) {
 			Priority:     20,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -149,6 +156,7 @@ func TestRemove(t *testing.T) {
 			Priority:     15,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -175,6 +183,7 @@ func TestRemoveMulti(t *testing.T) {
 			IsWantBlock:  true,
 			BlockSize:    10,
 			EntrySize:    10,
+			HaveBlock:    true,
 			SendDontHave: false,
 		},
 		peertask.Task{
@@ -182,6 +191,7 @@ func TestRemoveMulti(t *testing.T) {
 			Priority:     20,
 			IsWantBlock:  false,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    1,
 			SendDontHave: false,
 		},
@@ -190,6 +200,7 @@ func TestRemoveMulti(t *testing.T) {
 			Priority:     15,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -215,6 +226,7 @@ func TestRemoveActive(t *testing.T) {
 			Priority:     10,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -223,6 +235,7 @@ func TestRemoveActive(t *testing.T) {
 			Priority:     20,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    1,
 			SendDontHave: false,
 		},
@@ -231,6 +244,7 @@ func TestRemoveActive(t *testing.T) {
 			Priority:     15,
 			IsWantBlock:  true,
 			BlockSize:    10,
+			HaveBlock:    true,
 			EntrySize:    10,
 			SendDontHave: false,
 		},
@@ -267,6 +281,7 @@ func TestPushHaveVsBlock(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -275,6 +290,7 @@ func TestPushHaveVsBlock(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    10,
 		SendDontHave: false,
 	}
@@ -311,6 +327,7 @@ func TestPushSizeInfo(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    10,
 		SendDontHave: false,
 	}
@@ -319,6 +336,7 @@ func TestPushSizeInfo(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    0,
+		HaveBlock:    false,
 		EntrySize:    2,
 		SendDontHave: false,
 	}
@@ -327,6 +345,7 @@ func TestPushSizeInfo(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -335,6 +354,7 @@ func TestPushSizeInfo(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    0,
+		HaveBlock:    false,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -406,6 +426,7 @@ func TestPushHaveVsBlockActive(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    10,
 		SendDontHave: false,
 	}
@@ -414,6 +435,7 @@ func TestPushHaveVsBlockActive(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -450,6 +472,7 @@ func TestPushSizeInfoActive(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    10,
 		SendDontHave: false,
 	}
@@ -458,6 +481,7 @@ func TestPushSizeInfoActive(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    0,
+		HaveBlock:    false,
 		EntrySize:    2,
 		SendDontHave: false,
 	}
@@ -466,6 +490,7 @@ func TestPushSizeInfoActive(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -474,6 +499,7 @@ func TestPushSizeInfoActive(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    0,
+		HaveBlock:    false,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -545,6 +571,7 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    10,
 		SendDontHave: false,
 	}
@@ -553,6 +580,7 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -561,6 +589,7 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    0,
+		HaveBlock:    false,
 		EntrySize:    1,
 		SendDontHave: false,
 	}
@@ -571,7 +600,7 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 	tracker.PushTasks([]peertask.Task{wantHaveDontHave})
 
 	// Pop the want-have (DONT_HAVE) (which makes it active)
-	popped := tracker.PopTasks(20)
+	_ = tracker.PopTasks(20)
 
 	// Push a second want-have (with a size). Should be added to the pending
 	// queue.
@@ -580,7 +609,7 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 	// Push a want-block (should replace the pending want-have)
 	tracker.PushTasks([]peertask.Task{wantBlock})
 
-	popped = tracker.PopTasks(100)
+	popped := tracker.PopTasks(100)
 	if len(popped) != 1 {
 		t.Fatalf("Expected 1 task to be popped, received %d tasks", len(popped))
 	}
@@ -597,6 +626,7 @@ func TestTaskDone(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  true,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    10,
 		SendDontHave: false,
 	}
@@ -605,6 +635,7 @@ func TestTaskDone(t *testing.T) {
 		Priority:     10,
 		IsWantBlock:  false,
 		BlockSize:    10,
+		HaveBlock:    true,
 		EntrySize:    1,
 		SendDontHave: false,
 	}

@@ -43,6 +43,7 @@ type Task struct {
 	SendDontHave bool
 	EntrySize    int
 	BlockSize    int
+	HaveBlock    bool
 	Uuid         uuid.UUID
 }
 

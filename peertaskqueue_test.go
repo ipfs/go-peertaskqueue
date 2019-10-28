@@ -212,7 +212,7 @@ func TestPeerOrder(t *testing.T) {
 	// b: 1 + 3 + 1
 	// c: 2 + 2
 	// No more pending tasks, so next pop should return nothing
-	p, tsk = ptq.PopTasks("", 3)
+	_, tsk = ptq.PopTasks("", 3)
 	if len(tsk) != 0 {
 		t.Fatal("Expected no more tasks")
 	}
@@ -258,7 +258,7 @@ func TestPopSamePeer(t *testing.T) {
 	// b: 1            Pending: [3]
 	// Peer b has smallest active byte size in its queue, so it would be chosen
 	// but we explicitly request peer a again
-	p, tsk = ptq.PopTasks(a, 3)
+	_, tsk = ptq.PopTasks(a, 3)
 	if len(tsk) != 0 {
 		t.Fatal("Expected no tasks (request for peer a tasks)")
 	}
@@ -276,7 +276,7 @@ func TestPopSamePeer(t *testing.T) {
 	// a: 3 + 1
 	// b: 1 + 3
 	// No more pending tasks, so next pop should return nothing
-	p, tsk = ptq.PopTasks("", 3)
+	_, tsk = ptq.PopTasks("", 3)
 	if len(tsk) != 0 {
 		t.Fatal("Expected no more tasks")
 	}

@@ -128,7 +128,8 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 
 			// If we now have block size information, update the task with
 			// the new block size
-			if existingTask.BlockSize == 0 && task.BlockSize > 0 {
+			if !existingTask.HaveBlock && task.HaveBlock {
+				existingTask.HaveBlock = task.HaveBlock
 				existingTask.BlockSize = task.BlockSize
 			}
 
@@ -137,15 +138,16 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 				// Change the type from want-have to want-block
 				existingTask.IsWantBlock = true
 				// If the want-have was a DONT_HAVE, or the want-block has a size
-				if existingTask.BlockSize == 0 || task.BlockSize > 0 {
+				if !existingTask.HaveBlock || task.HaveBlock {
 					// Update the entry size
+					existingTask.HaveBlock = task.HaveBlock
 					existingTask.EntrySize = task.EntrySize
 				}
 			}
 
 			// If the task is a want-block, make sure the entry size is equal
-			// to the block size
-			if existingTask.IsWantBlock && existingTask.BlockSize > 0 {
+			// to the block size (because we will send the whole block)
+			if existingTask.IsWantBlock && existingTask.HaveBlock {
 				existingTask.EntrySize = existingTask.BlockSize
 			}
 
@@ -271,7 +273,7 @@ func (p *PeerTracker) taskHasMoreInfoThanActiveTasks(task peertask.Task) bool {
 		if task.Identifier == at.Identifier {
 			taskWithIdExists = true
 
-			if at.BlockSize > 0 {
+			if at.HaveBlock {
 				haveSize = true
 			}
 
@@ -294,7 +296,7 @@ func (p *PeerTracker) taskHasMoreInfoThanActiveTasks(task peertask.Task) bool {
 
 	// If there is no size information for the CID and the new task has
 	// size information, the new task is better
-	if !haveSize && task.BlockSize > 0 {
+	if !haveSize && task.HaveBlock {
 		return true
 	}
 
