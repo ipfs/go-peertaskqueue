@@ -7,9 +7,29 @@ import (
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	peer "github.com/libp2p/go-libp2p-core/peer"
-
-	"github.com/google/uuid"
 )
+
+// TaskMerger is an interface that is used to merge new tasks into the active
+// and pending queues
+type TaskMerger interface {
+	// HasNewInfo indicates whether the given task has more information than
+	// the existing group of tasks (which have the same Topic), and thus should
+	// be merged.
+	HasNewInfo(task peertask.Task, existing []peertask.Task) bool
+	// Merge copies relevant fields from a new task to an existing task.
+	Merge(task peertask.Task, existing *peertask.Task)
+}
+
+// DefaultTaskMerger is the TaskMerger used by default. It never overwrites an
+// existing task (with the same Topic).
+type DefaultTaskMerger struct{}
+
+func (*DefaultTaskMerger) HasNewInfo(task peertask.Task, existing []peertask.Task) bool {
+	return false
+}
+
+func (*DefaultTaskMerger) Merge(task peertask.Task, existing *peertask.Task) {
+}
 
 // PeerTracker tracks task blocks for a single peer, as well as active tasks
 // for that peer
@@ -17,9 +37,9 @@ type PeerTracker struct {
 	target peer.ID
 
 	// Tasks that are pending being made active
-	pendingTasks map[peertask.Identifier]*peertask.QueueTask
+	pendingTasks map[peertask.Topic]*peertask.QueueTask
 	// Tasks that have been made active
-	activeTasks map[uuid.UUID]*peertask.QueueTask
+	activeTasks map[*peertask.Task]struct{}
 
 	// activeBytes must be locked around as it will be updated externally
 	activelk    sync.Mutex
@@ -32,15 +52,18 @@ type PeerTracker struct {
 
 	// priority queue of tasks belonging to this peer
 	taskQueue pq.PQ
+
+	taskMerger TaskMerger
 }
 
 // New creates a new PeerTracker
-func New(target peer.ID) *PeerTracker {
+func New(target peer.ID, taskMerger TaskMerger) *PeerTracker {
 	return &PeerTracker{
 		target:       target,
 		taskQueue:    pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
-		pendingTasks: make(map[peertask.Identifier]*peertask.QueueTask),
-		activeTasks:  make(map[uuid.UUID]*peertask.QueueTask),
+		pendingTasks: make(map[peertask.Topic]*peertask.QueueTask),
+		activeTasks:  make(map[*peertask.Task]struct{}),
+		taskMerger:   taskMerger,
 	}
 }
 
@@ -117,8 +140,8 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 			continue
 		}
 
-		// If there is already a non-active task with this Identifier
-		if existingTask, ok := p.pendingTasks[task.Identifier]; ok {
+		// If there is already a non-active task with this Topic
+		if existingTask, ok := p.pendingTasks[task.Topic]; ok {
 			// If the new task has a higher priority than the old task,
 			if task.Priority > existingTask.Priority {
 				// Update the priority and the task's position in the queue
@@ -126,118 +149,91 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 				p.taskQueue.Update(existingTask.Index())
 			}
 
-			// If we now have block size information, update the task with
-			// the new block size
-			if !existingTask.HaveBlock && task.HaveBlock {
-				existingTask.HaveBlock = task.HaveBlock
-				existingTask.BlockSize = task.BlockSize
-			}
+			p.taskMerger.Merge(task, &existingTask.Task)
 
-			// If replacing a want-have with a want-block
-			if !existingTask.IsWantBlock && task.IsWantBlock {
-				// Change the type from want-have to want-block
-				existingTask.IsWantBlock = true
-				// If the want-have was a DONT_HAVE, or the want-block has a size
-				if !existingTask.HaveBlock || task.HaveBlock {
-					// Update the entry size
-					existingTask.HaveBlock = task.HaveBlock
-					existingTask.EntrySize = task.EntrySize
-				}
-			}
-
-			// If the task is a want-block, make sure the entry size is equal
-			// to the block size (because we will send the whole block)
-			if existingTask.IsWantBlock && existingTask.HaveBlock {
-				existingTask.EntrySize = existingTask.BlockSize
-			}
-
-			// A task with the Identifier exists, so we don't need to add
+			// A task with the Topic exists, so we don't need to add
 			// the new task to the queue
 			continue
 		}
 
 		// Push the new task onto the queue
 		qTask := peertask.NewQueueTask(task, p.target, now)
-		p.pendingTasks[task.Identifier] = qTask
+		p.pendingTasks[task.Topic] = qTask
 		p.taskQueue.Push(qTask)
 	}
 }
 
 // PopTasks pops as many tasks as possible up to the given size off the queue
 // in priority order
-func (p *PeerTracker) PopTasks(maxSize int) []peertask.Task {
-	var out []peertask.Task
+func (p *PeerTracker) PopTasks(maxSize int) []*peertask.Task {
+	var out []*peertask.Task
 	size := 0
 	for p.taskQueue.Len() > 0 && p.freezeVal == 0 {
-		// Pop a task off the queue
-		t := p.taskQueue.Pop().(*peertask.QueueTask)
+		// Peek at the next task in the queue
+		t := p.taskQueue.Peek().(*peertask.QueueTask)
 
 		// Ignore tasks that have been cancelled
-		task, ok := p.pendingTasks[t.Identifier]
+		task, ok := p.pendingTasks[t.Topic]
 		if !ok {
+			p.taskQueue.Pop()
 			continue
 		}
 
 		// If the next task is too big for the message
-		if size+task.EntrySize > maxSize {
-			// This task doesn't fit into the message, so push it back onto the
-			// queue.
-			p.taskQueue.Push(task)
-
+		if size+task.Size > maxSize {
 			// We have as many tasks as we can fit into the message, so return
 			// the tasks
 			return out
 		}
 
-		// Start the task (this makes it "active")
-		p.startTask(task)
+		// Pop the task off the queue
+		p.taskQueue.Pop()
 
-		out = append(out, task.Task)
-		size = size + task.EntrySize
+		// Start the task (this makes it "active")
+		p.startTask(&task.Task)
+
+		out = append(out, &task.Task)
+		size = size + task.Size
 	}
 
 	return out
 }
 
 // startTask signals that a task was started for this peer.
-func (p *PeerTracker) startTask(task *peertask.QueueTask) {
+func (p *PeerTracker) startTask(task *peertask.Task) {
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
 
 	// Remove task from pending queue
-	delete(p.pendingTasks, task.Identifier)
+	delete(p.pendingTasks, task.Topic)
 
 	// Add task to active queue
-	if _, ok := p.activeTasks[task.Uuid]; !ok {
-		p.activeTasks[task.Uuid] = task
-		p.activeBytes += task.EntrySize
+	if _, ok := p.activeTasks[task]; !ok {
+		p.activeTasks[task] = struct{}{}
+		p.activeBytes += task.Size
 	}
 }
 
 // TaskDone signals that a task was completed for this peer.
-func (p *PeerTracker) TaskDone(task peertask.Task) {
+func (p *PeerTracker) TaskDone(task *peertask.Task) {
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
 
 	// Remove task from active queue
-	if task, ok := p.activeTasks[task.Uuid]; ok {
-		delete(p.activeTasks, task.Uuid)
-		p.activeBytes -= task.EntrySize
+	if _, ok := p.activeTasks[task]; ok {
+		delete(p.activeTasks, task)
+		p.activeBytes -= task.Size
 		if p.activeBytes < 0 {
 			panic("more tasks finished than started!")
 		}
 	}
 }
 
-// Remove removes the task with the given identifier from this peer's queue
-func (p *PeerTracker) Remove(identifier peertask.Identifier) bool {
-	return p.remove(identifier, true) || p.remove(identifier, false)
-}
-
-func (p *PeerTracker) remove(identifier peertask.Identifier, isWantBlock bool) bool {
-	_, ok := p.pendingTasks[identifier]
+// Remove removes the task with the given topic from this peer's queue
+func (p *PeerTracker) Remove(topic peertask.Topic) bool {
+	_, ok := p.pendingTasks[topic]
 	if ok {
-		delete(p.pendingTasks, identifier)
+		delete(p.pendingTasks, topic)
 	}
 	return ok
 }
@@ -268,39 +264,17 @@ func (p *PeerTracker) IsFrozen() bool {
 // Indicates whether the new task adds any more information over tasks that are
 // already in the active task queue
 func (p *PeerTracker) taskHasMoreInfoThanActiveTasks(task peertask.Task) bool {
-	taskWithIdExists := false
-	haveSize := false
-	haveBlock := false
-	for _, at := range p.activeTasks {
-		if task.Identifier == at.Identifier {
-			taskWithIdExists = true
-
-			if at.HaveBlock {
-				haveSize = true
-			}
-
-			if at.IsWantBlock {
-				haveBlock = true
-			}
+	var tasksWithTopic []peertask.Task
+	for at := range p.activeTasks {
+		if task.Topic == at.Topic {
+			tasksWithTopic = append(tasksWithTopic, *at)
 		}
 	}
 
-	// No existing task with that id, so the new task has more info
-	if !taskWithIdExists {
+	// No tasks with that topic, so the new task adds information
+	if len(tasksWithTopic) == 0 {
 		return true
 	}
 
-	// If there is no active want-block and the new task is a want-block,
-	// the new task is better
-	if !haveBlock && task.IsWantBlock {
-		return true
-	}
-
-	// If there is no size information for the CID and the new task has
-	// size information, the new task is better
-	if !haveSize && task.HaveBlock {
-		return true
-	}
-
-	return false
+	return p.taskMerger.HasNewInfo(task, tasksWithTopic)
 }

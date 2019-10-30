@@ -29,6 +29,7 @@ type PeerTaskQueue struct {
 	frozenPeers    map[peer.ID]struct{}
 	hooks          []hookFunc
 	ignoreFreezing bool
+	taskMerger     peertracker.TaskMerger
 }
 
 // Option is a function that configures the peer task queue
@@ -48,6 +49,16 @@ func IgnoreFreezing(ignoreFreezing bool) Option {
 		previous := ptq.ignoreFreezing
 		ptq.ignoreFreezing = ignoreFreezing
 		return IgnoreFreezing(previous)
+	}
+}
+
+// TaskMerger is an option that specifies merge behaviour when pushing a task
+// with the same Topic as an existing Topic.
+func TaskMerger(tmfp peertracker.TaskMerger) Option {
+	return func(ptq *PeerTaskQueue) Option {
+		previous := ptq.taskMerger
+		ptq.taskMerger = tmfp
+		return TaskMerger(previous)
 	}
 }
 
@@ -96,6 +107,7 @@ func New(options ...Option) *PeerTaskQueue {
 		peerTrackers: make(map[peer.ID]*peertracker.PeerTracker),
 		frozenPeers:  make(map[peer.ID]struct{}),
 		pQueue:       pq.New(peertracker.PeerCompare),
+		taskMerger:   &peertracker.DefaultTaskMerger{},
 	}
 	ptq.Options(options...)
 	return ptq
@@ -127,7 +139,7 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 
 	peerTracker, ok := ptq.peerTrackers[to]
 	if !ok {
-		peerTracker = peertracker.New(to)
+		peerTracker = peertracker.New(to, ptq.taskMerger)
 		ptq.pQueue.Push(peerTracker)
 		ptq.peerTrackers[to] = peerTracker
 		ptq.callHooks(to, peerAdded)
@@ -139,8 +151,7 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 
 // PopTasks pops the highest priority tasks from the peer off the queue, up to
 // the given maximum size of those tasks.
-// If peer is "", the highest priority peer is chosen.
-func (ptq *PeerTaskQueue) PopTasks(from peer.ID, maxSize int) (peer.ID, []peertask.Task) {
+func (ptq *PeerTaskQueue) PopTasks(maxSize int) (peer.ID, []*peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
 
@@ -150,20 +161,10 @@ func (ptq *PeerTaskQueue) PopTasks(from peer.ID, maxSize int) (peer.ID, []peerta
 
 	var peerTracker *peertracker.PeerTracker
 
-	// If the peer wasn't specified, choose the highest priority peer
-	popTracker := from == ""
-	if popTracker {
-		peerTracker = ptq.pQueue.Pop().(*peertracker.PeerTracker)
-		if peerTracker == nil {
-			return "", nil
-		}
-	} else {
-		// Get the requested peer tracker
-		var ok bool
-		peerTracker, ok = ptq.peerTrackers[from]
-		if !ok || peerTracker.IsIdle() {
-			return "", nil
-		}
+	// Choose the highest priority peer
+	peerTracker = ptq.pQueue.Peek().(*peertracker.PeerTracker)
+	if peerTracker == nil {
+		return "", nil
 	}
 
 	// Get the highest priority tasks for the given peer
@@ -171,14 +172,15 @@ func (ptq *PeerTaskQueue) PopTasks(from peer.ID, maxSize int) (peer.ID, []peerta
 
 	// If the peer has no more tasks, remove its peer tracker
 	if peerTracker.IsIdle() {
+		ptq.pQueue.Pop()
 		target := peerTracker.Target()
 		delete(ptq.peerTrackers, target)
 		delete(ptq.frozenPeers, target)
 		ptq.callHooks(target, peerRemoved)
-	} else if popTracker {
-		// If it does have more tasks, and we popped it, put it back into the
-		// peer queue
-		ptq.pQueue.Push(peerTracker)
+	} else {
+		// We may have modified the peer tracker's state (by popping tasks), so
+		// update its position in the priority queue
+		ptq.pQueue.Update(peerTracker.Index())
 	}
 
 	return peerTracker.Target(), out
@@ -186,7 +188,7 @@ func (ptq *PeerTaskQueue) PopTasks(from peer.ID, maxSize int) (peer.ID, []peerta
 
 // TasksDone is called to indicate that the given tasks have completed
 // for the given peer
-func (ptq *PeerTaskQueue) TasksDone(to peer.ID, tasks ...peertask.Task) {
+func (ptq *PeerTaskQueue) TasksDone(to peer.ID, tasks ...*peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
 
@@ -207,13 +209,13 @@ func (ptq *PeerTaskQueue) TasksDone(to peer.ID, tasks ...peertask.Task) {
 }
 
 // Remove removes a task from the queue.
-func (ptq *PeerTaskQueue) Remove(identifier peertask.Identifier, p peer.ID) {
+func (ptq *PeerTaskQueue) Remove(topic peertask.Topic, p peer.ID) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
 
 	peerTracker, ok := ptq.peerTrackers[p]
 	if ok {
-		if peerTracker.Remove(identifier) {
+		if peerTracker.Remove(topic) {
 			// we now also 'freeze' that partner. If they sent us a cancel for a
 			// block we were about to send them, we should wait a short period of time
 			// to make sure we receive any other in-flight cancels before sending

@@ -5,8 +5,6 @@ import (
 
 	pq "github.com/ipfs/go-ipfs-pq"
 	peer "github.com/libp2p/go-libp2p-core/peer"
-
-	"github.com/google/uuid"
 )
 
 // FIFOCompare is a basic task comparator that returns tasks in the order created.
@@ -23,7 +21,7 @@ var PriorityCompare = func(a, b *QueueTask) bool {
 	return FIFOCompare(a, b)
 }
 
-// WrapCompare wraps a TaskBlock comparison function so it can be used as
+// WrapCompare wraps a QueueTask comparison function so it can be used as
 // comparison for a priority queue
 func WrapCompare(f func(a, b *QueueTask) bool) func(a, b pq.Elem) bool {
 	return func(a, b pq.Elem) bool {
@@ -31,28 +29,23 @@ func WrapCompare(f func(a, b *QueueTask) bool) func(a, b pq.Elem) bool {
 	}
 }
 
-// Identifier is a unique identifier for a task. It's used by the client library
+// Topic is a non-unique name for a task. It's used by the client library
 // to act on a task once it exits the queue.
-type Identifier interface{}
+type Topic interface{}
 
-// Task is a single task to be executed as part of a task block.
+// Data is used by the client to associate extra information with a Task
+type Data interface{}
+
+// Task is a single task to be executed in Priority order.
 type Task struct {
-	// Identifier for the task (may not be unique)
-	Identifier Identifier
+	// Topic for the task
+	Topic Topic
 	// Priority of the task
 	Priority int
-	// Tasks can be want-have or want-block
-	IsWantBlock bool
-	// Whether to immediately send a response if the block is not found
-	SendDontHave bool
-	// The size that this task will take up in the response message
-	EntrySize int
-	// The size of the block corresponding to the identifier
-	BlockSize int
-	// Whether the block was found
-	HaveBlock bool
-	// Unique ID
-	Uuid uuid.UUID
+	// The size of the task - peers with bigger size queues are higher priority
+	Size int
+	// Arbitrary data associated with this Task by the client
+	Data Data
 }
 
 // QueueTask contains a Task, and also some bookkeeping information.
@@ -66,13 +59,11 @@ type QueueTask struct {
 
 // NewQueueTask creates a new QueueTask from the given Task.
 func NewQueueTask(task Task, target peer.ID, created time.Time) *QueueTask {
-	t := &QueueTask{
+	return &QueueTask{
 		Task:    task,
 		Target:  target,
 		created: created,
 	}
-	t.Uuid = uuid.New()
-	return t
 }
 
 // Index implements pq.Elem.
