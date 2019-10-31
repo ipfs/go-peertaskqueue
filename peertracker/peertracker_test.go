@@ -81,12 +81,8 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 		},
 	}
 	tracker.PushTasks(tasks)
-	popped := tracker.PopTasks(5)
-	if len(popped) != 0 {
-		t.Fatal("Expected 0 tasks")
-	}
 
-	popped = tracker.PopTasks(10)
+	popped := tracker.PopTasks(10)
 	if len(popped) != 1 {
 		t.Fatal("Expected 1 task")
 	}
@@ -105,6 +101,38 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 	popped = tracker.PopTasks(100)
 	if len(popped) != 0 {
 		t.Fatal("Expected 0 tasks")
+	}
+}
+
+func TestPushPopFirstItemOversized(t *testing.T) {
+	partner := testutil.GeneratePeers(1)[0]
+	tracker := New(partner, &DefaultTaskMerger{})
+
+	tasks := []peertask.Task{
+		peertask.Task{
+			Topic:    "1",
+			Priority: 20,
+			Size:     10,
+		},
+		peertask.Task{
+			Topic:    "2",
+			Priority: 10,
+			Size:     5,
+		},
+	}
+	tracker.PushTasks(tasks)
+
+	// Pop with max size 7.
+	// PopTasks should always return the first task even if it's over max size
+	// (this is to prevent large tasks from blocking up the queue).
+	popped := tracker.PopTasks(7)
+	if len(popped) != 1 || popped[0].Topic != "1" {
+		t.Fatal("Expected first task to be popped")
+	}
+
+	popped = tracker.PopTasks(100)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
 	}
 }
 
@@ -270,31 +298,41 @@ func TestReplaceTaskSize(t *testing.T) {
 	tasks := []peertask.Task{
 		peertask.Task{
 			Topic:    "1",
-			Priority: 10,
+			Priority: 20,
 			Size:     10,
 			Data:     "a",
 		},
 		peertask.Task{
-			Topic:    "1",
-			Priority: 20,
-			Size:     20,
+			Topic:    "2",
+			Priority: 10,
+			Size:     10,
 			Data:     "b",
+		},
+		peertask.Task{
+			Topic:    "2",
+			Priority: 10,
+			Size:     30,
+			Data:     "c",
 		},
 	}
 
 	// Push task "a"
 	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
 
-	// Push task "b". Has same topic and permissive task merger, so should
-	// replace task "a", including new size
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "1"
+	// Push task "b"
+	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "2"
 
-	// Pop with maxSize 10. Should not pop anything because Size is now 20.
-	popped := tracker.PopTasks(10)
-	if len(popped) != 0 {
-		t.Fatal("Expected no tasks")
+	// Push task "c". Has same topic as task "b" and permissive task merger,
+	// so should replace task "b", and update its size
+	tracker.PushTasks([]peertask.Task{tasks[2]}) // Topic "2"
+
+	// Pop with maxSize 20. Should only pop task "a" because only other task
+	// (with Topic "2") now has size 30.
+	popped := tracker.PopTasks(20)
+	if len(popped) != 1 || popped[0].Data != "a" {
+		t.Fatal("Expected 1 task", popped[0], popped[1])
 	}
-	popped = tracker.PopTasks(20)
+	popped = tracker.PopTasks(30)
 	if len(popped) != 1 {
 		t.Fatal("Expected 1 task")
 	}

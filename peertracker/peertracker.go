@@ -164,9 +164,14 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 }
 
 // PopTasks pops as many tasks as possible up to the given size off the queue
-// in priority order
+// in priority order. Note that the first task is always popped, even if it's
+// over maxSize, so that large tasks don't block up the queue.
 func (p *PeerTracker) PopTasks(maxSize int) []*peertask.Task {
 	var out []*peertask.Task
+	if maxSize <= 0 {
+		return out
+	}
+
 	size := 0
 	for p.taskQueue.Len() > 0 && p.freezeVal == 0 {
 		// Peek at the next task in the queue
@@ -179,8 +184,11 @@ func (p *PeerTracker) PopTasks(maxSize int) []*peertask.Task {
 			continue
 		}
 
-		// If the next task is too big for the message
-		if size+task.Size > maxSize {
+		// We always pop the first task off the queue, even if it's bigger
+		// than the max size. This ensures that big tasks don't get stuck in
+		// the queue forever.
+		// After the first task, pop tasks if they fit under the max size.
+		if len(out) > 0 && size+task.Size > maxSize {
 			// We have as many tasks as we can fit into the message, so return
 			// the tasks
 			return out

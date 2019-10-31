@@ -150,7 +150,9 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 }
 
 // PopTasks pops the highest priority tasks from the peer off the queue, up to
-// the given maximum size of those tasks.
+// the given maximum size of those tasks. Note that the first task is always
+// popped off the queue even if it's over maxSize, to prevent large tasks from
+// blocking up the queue.
 func (ptq *PeerTaskQueue) PopTasks(maxSize int) (peer.ID, []*peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
