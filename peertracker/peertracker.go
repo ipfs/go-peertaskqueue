@@ -173,17 +173,11 @@ func (p *PeerTracker) PopTasks(targetMinWork int) []*peertask.Task {
 		// Pop the next task off the queue
 		t := p.taskQueue.Pop().(*peertask.QueueTask)
 
-		// Ignore tasks that have been cancelled
-		task, ok := p.pendingTasks[t.Topic]
-		if !ok {
-			continue
-		}
-
 		// Start the task (this makes it "active")
-		p.startTask(&task.Task)
+		p.startTask(&t.Task)
 
-		out = append(out, &task.Task)
-		work += task.Work
+		out = append(out, &t.Task)
+		work += t.Work
 	}
 
 	return out
@@ -221,9 +215,10 @@ func (p *PeerTracker) TaskDone(task *peertask.Task) {
 
 // Remove removes the task with the given topic from this peer's queue
 func (p *PeerTracker) Remove(topic peertask.Topic) bool {
-	_, ok := p.pendingTasks[topic]
+	t, ok := p.pendingTasks[topic]
 	if ok {
 		delete(p.pendingTasks, topic)
+		p.taskQueue.Remove(t.Index())
 	}
 	return ok
 }
