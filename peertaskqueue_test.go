@@ -83,10 +83,10 @@ func TestFreezeUnfreeze(t *testing.T) {
 	// Push 5 blocks to each peer
 	for i := 0; i < 5; i++ {
 		is := fmt.Sprint(i)
-		ptq.PushTasks(a, peertask.Task{Topic: is, Size: 1})
-		ptq.PushTasks(b, peertask.Task{Topic: is, Size: 1})
-		ptq.PushTasks(c, peertask.Task{Topic: is, Size: 1})
-		ptq.PushTasks(d, peertask.Task{Topic: is, Size: 1})
+		ptq.PushTasks(a, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(b, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(c, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(d, peertask.Task{Topic: is, Work: 1})
 	}
 
 	// now, pop off four tasks, there should be one from each
@@ -121,10 +121,10 @@ func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		is := fmt.Sprint(i)
-		ptq.PushTasks(a, peertask.Task{Topic: is, Size: 1})
-		ptq.PushTasks(b, peertask.Task{Topic: is, Size: 1})
-		ptq.PushTasks(c, peertask.Task{Topic: is, Size: 1})
-		ptq.PushTasks(d, peertask.Task{Topic: is, Size: 1})
+		ptq.PushTasks(a, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(b, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(c, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(d, peertask.Task{Topic: is, Work: 1})
 	}
 
 	// now, pop off four tasks, there should be one from each
@@ -144,75 +144,74 @@ func TestPeerOrder(t *testing.T) {
 	b := peers[1]
 	c := peers[2]
 
-	ptq.PushTasks(a, peertask.Task{Topic: "1", Size: 3, Priority: 3})
-	ptq.PushTasks(a, peertask.Task{Topic: "2", Size: 1, Priority: 2})
-	ptq.PushTasks(a, peertask.Task{Topic: "3", Size: 2, Priority: 1})
+	ptq.PushTasks(a, peertask.Task{Topic: "1", Work: 3, Priority: 2})
+	ptq.PushTasks(a, peertask.Task{Topic: "2", Work: 1, Priority: 1})
 
-	ptq.PushTasks(b, peertask.Task{Topic: "4", Size: 1, Priority: 3})
-	ptq.PushTasks(b, peertask.Task{Topic: "5", Size: 3, Priority: 2})
-	ptq.PushTasks(b, peertask.Task{Topic: "6", Size: 1, Priority: 1})
+	ptq.PushTasks(b, peertask.Task{Topic: "3", Work: 1, Priority: 3})
+	ptq.PushTasks(b, peertask.Task{Topic: "4", Work: 3, Priority: 2})
+	ptq.PushTasks(b, peertask.Task{Topic: "5", Work: 1, Priority: 1})
 
-	ptq.PushTasks(c, peertask.Task{Topic: "7", Size: 2, Priority: 3})
-	ptq.PushTasks(c, peertask.Task{Topic: "8", Size: 2, Priority: 1})
+	ptq.PushTasks(c, peertask.Task{Topic: "6", Work: 2, Priority: 2})
+	ptq.PushTasks(c, peertask.Task{Topic: "7", Work: 2, Priority: 1})
 
 	// All peers have nothing in their active queue, so equal chance of any
 	// peer being chosen
 	var ps []string
 	var ids []string
 	for i := 0; i < 3; i++ {
-		p, tasks := ptq.PopTasks(3)
+		p, tasks := ptq.PopTasks(1)
 		ps = append(ps, p.String())
 		ids = append(ids, fmt.Sprint(tasks[0].Topic))
 	}
 	matchArrays(t, ps, []string{a.String(), b.String(), c.String()})
-	matchArrays(t, ids, []string{"1", "4", "7"})
+	matchArrays(t, ids, []string{"1", "3", "6"})
 
 	// Active queues:
-	// a: 3            Pending: [1, 2]
+	// a: 3            Pending: [1]
 	// b: 1            Pending: [3, 1]
 	// c: 2            Pending: [2]
-	// So next peer should be b
-	p, tsk := ptq.PopTasks(3)
+	// So next peer should be b (least work in active queue)
+	p, tsk := ptq.PopTasks(1)
+	if len(tsk) != 1 || p != b || tsk[0].Topic != "4" {
+		t.Fatal("Expected ID 4 from peer b")
+	}
+
+	// Active queues:
+	// a: 3            Pending: [1]
+	// b: 1 + 3        Pending: [1]
+	// c: 2            Pending: [2]
+	// So next peer should be c (least work in active queue)
+	p, tsk = ptq.PopTasks(1)
+	if len(tsk) != 1 || p != c || tsk[0].Topic != "7" {
+		t.Fatal("Expected ID 7 from peer c")
+	}
+
+	// Active queues:
+	// a: 3            Pending: [1]
+	// b: 1 + 3        Pending: [1]
+	// c: 2 + 2
+	// So next peer should be a (least work in active queue)
+	p, tsk = ptq.PopTasks(1)
+	if len(tsk) != 1 || p != a || tsk[0].Topic != "2" {
+		t.Fatal("Expected ID 2 from peer a")
+	}
+
+	// Active queues:
+	// a: 3 + 1
+	// b: 1 + 3        Pending: [1]
+	// c: 2 + 2
+	// a & c have no more pending tasks, so next peer should be b
+	p, tsk = ptq.PopTasks(1)
 	if len(tsk) != 1 || p != b || tsk[0].Topic != "5" {
 		t.Fatal("Expected ID 5 from peer b")
 	}
 
 	// Active queues:
-	// a: 3            Pending: [1, 2]
-	// b: 1 + 3        Pending: [1]
-	// c: 2            Pending: [2]
-	// So next peer should be c
-	p, tsk = ptq.PopTasks(3)
-	if len(tsk) != 1 || p != c || tsk[0].Topic != "8" {
-		t.Fatal("Expected ID 8 from peer c")
-	}
-
-	// Active queues:
-	// a: 3            Pending: [1, 2]
-	// b: 1 + 3        Pending: [1]
-	// c: 2 + 2
-	// So next peer should be a
-	p, tsk = ptq.PopTasks(3)
-	if len(tsk) != 2 || p != a || tsk[0].Topic != "2" || tsk[1].Topic != "3" {
-		t.Fatal("Expected ID 2 & 3 from peer a")
-	}
-
-	// Active queues:
-	// a: 3 + 1 + 2
-	// b: 1 + 3        Pending: [1]
-	// c: 2 + 2
-	// a & c have no more pending tasks, so next peer should be b
-	p, tsk = ptq.PopTasks(3)
-	if len(tsk) != 1 || p != b || tsk[0].Topic != "6" {
-		t.Fatal("Expected ID 6 from peer b")
-	}
-
-	// Active queues:
-	// a: 3 + 1 + 2
+	// a: 3 + 1
 	// b: 1 + 3 + 1
 	// c: 2 + 2
 	// No more pending tasks, so next pop should return nothing
-	_, tsk = ptq.PopTasks(3)
+	_, tsk = ptq.PopTasks(1)
 	if len(tsk) != 0 {
 		t.Fatal("Expected no more tasks")
 	}

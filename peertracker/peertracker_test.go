@@ -24,10 +24,10 @@ func TestPushPop(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 1,
-			Size:     10,
+			Work:     10,
 		},
 	}
-	tracker.PushTasks(tasks)
+	tracker.PushTasks(tasks...)
 	popped := tracker.PopTasks(100)
 	if len(popped) != 1 {
 		t.Fatal("Expected 1 task")
@@ -45,10 +45,10 @@ func TestPopNegativeOrZeroSize(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 1,
-			Size:     10,
+			Work:     10,
 		},
 	}
-	tracker.PushTasks(tasks)
+	tracker.PushTasks(tasks...)
 	popped := tracker.PopTasks(-1)
 	if len(popped) != 0 {
 		t.Fatal("Expected 0 tasks")
@@ -67,20 +67,20 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 		},
 		peertask.Task{
 			Topic:    "2",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 		},
 		peertask.Task{
 			Topic:    "3",
 			Priority: 15,
-			Size:     10,
+			Work:     10,
 		},
 	}
-	tracker.PushTasks(tasks)
+	tracker.PushTasks(tasks...)
 
 	popped := tracker.PopTasks(10)
 	if len(popped) != 1 {
@@ -104,7 +104,7 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 	}
 }
 
-func TestPushPopFirstItemOversized(t *testing.T) {
+func TestPopFirstItemAlways(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
 	tracker := New(partner, &DefaultTaskMerger{})
 
@@ -112,22 +112,57 @@ func TestPushPopFirstItemOversized(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 		},
 		peertask.Task{
 			Topic:    "2",
 			Priority: 10,
-			Size:     5,
+			Work:     5,
 		},
 	}
-	tracker.PushTasks(tasks)
+	tracker.PushTasks(tasks...)
 
-	// Pop with max size 7.
-	// PopTasks should always return the first task even if it's over max size
-	// (this is to prevent large tasks from blocking up the queue).
+	// Pop with target size 7.
+	// PopTasks should always return the first task even if it's under target work.
 	popped := tracker.PopTasks(7)
 	if len(popped) != 1 || popped[0].Topic != "1" {
 		t.Fatal("Expected first task to be popped")
+	}
+
+	popped = tracker.PopTasks(100)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
+	}
+}
+
+func TestPopItemsToCoverTargetWork(t *testing.T) {
+	partner := testutil.GeneratePeers(1)[0]
+	tracker := New(partner, &DefaultTaskMerger{})
+
+	tasks := []peertask.Task{
+		peertask.Task{
+			Topic:    "1",
+			Priority: 20,
+			Work:     5,
+		},
+		peertask.Task{
+			Topic:    "2",
+			Priority: 10,
+			Work:     5,
+		},
+		peertask.Task{
+			Topic:    "3",
+			Priority: 5,
+			Work:     5,
+		},
+	}
+	tracker.PushTasks(tasks...)
+
+	// Pop with target size 7.
+	// PopTasks should return enough items to cover the target work.
+	popped := tracker.PopTasks(7)
+	if len(popped) != 2 || popped[0].Topic != "1" || popped[1].Topic != "2" {
+		t.Fatal("Expected first two tasks to be popped")
 	}
 
 	popped = tracker.PopTasks(100)
@@ -144,20 +179,20 @@ func TestRemove(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 		},
 		peertask.Task{
 			Topic:    "2",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 		},
 		peertask.Task{
 			Topic:    "3",
 			Priority: 15,
-			Size:     10,
+			Work:     10,
 		},
 	}
-	tracker.PushTasks(tasks)
+	tracker.PushTasks(tasks...)
 	tracker.Remove("2")
 	popped := tracker.PopTasks(100)
 	if len(popped) != 2 {
@@ -176,20 +211,20 @@ func TestRemoveMulti(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 20,
-			Size:     1,
+			Work:     1,
 		},
 		peertask.Task{
 			Topic:    "2",
 			Priority: 15,
-			Size:     10,
+			Work:     10,
 		},
 	}
-	tracker.PushTasks(tasks)
+	tracker.PushTasks(tasks...)
 	tracker.Remove("1")
 	popped := tracker.PopTasks(100)
 	if len(popped) != 1 {
@@ -208,19 +243,19 @@ func TestTaskDone(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "a",
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 			Data:     "b",
 		},
 	}
 
 	// Push task "a"
-	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
+	tracker.PushTasks(tasks[0]) // Topic "1"
 
 	// Pop task "a". This makes the task active.
 	popped := tracker.PopTasks(10)
@@ -232,7 +267,7 @@ func TestTaskDone(t *testing.T) {
 	tracker.TaskDone(popped[0])
 
 	// Push task "b"
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "1"
+	tracker.PushTasks(tasks[1]) // Topic "1"
 
 	// Pop all tasks. Task "a" was done so task "b" should have been allowed to
 	// be added.
@@ -249,7 +284,7 @@ func (*permissiveTaskMerger) HasNewInfo(task peertask.Task, existing []peertask.
 }
 func (*permissiveTaskMerger) Merge(task peertask.Task, existing *peertask.Task) {
 	existing.Data = task.Data
-	existing.Size = task.Size
+	existing.Work = task.Work
 }
 
 func TestReplaceTaskPermissive(t *testing.T) {
@@ -260,23 +295,23 @@ func TestReplaceTaskPermissive(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "a",
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 			Data:     "b",
 		},
 	}
 
 	// Push task "a"
-	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
+	tracker.PushTasks(tasks[0]) // Topic "1"
 
 	// Push task "b". Has same topic and permissive task merger, so should
 	// replace task "a".
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "1"
+	tracker.PushTasks(tasks[1]) // Topic "1"
 
 	// Pop all tasks, should only be task "b".
 	popped := tracker.PopTasks(100)
@@ -298,39 +333,39 @@ func TestReplaceTaskSize(t *testing.T) {
 	tasks := []peertask.Task{
 		peertask.Task{
 			Topic:    "1",
-			Priority: 20,
-			Size:     10,
+			Priority: 10,
+			Work:     10,
 			Data:     "a",
 		},
 		peertask.Task{
-			Topic:    "2",
+			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     20,
 			Data:     "b",
 		},
 		peertask.Task{
 			Topic:    "2",
-			Priority: 10,
-			Size:     30,
+			Priority: 5,
+			Work:     5,
 			Data:     "c",
 		},
 	}
 
 	// Push task "a"
-	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
+	tracker.PushTasks(tasks[0]) // Topic "1"
 
-	// Push task "b"
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "2"
+	// Push task "b". Has same topic as task "a" and permissive task merger,
+	// so should replace task "a", and update its Work from 10 to 20.
+	tracker.PushTasks(tasks[1]) // Topic "1"
 
-	// Push task "c". Has same topic as task "b" and permissive task merger,
-	// so should replace task "b", and update its size
-	tracker.PushTasks([]peertask.Task{tasks[2]}) // Topic "2"
+	// Push task "c"
+	tracker.PushTasks(tasks[2]) // Topic "2"
 
-	// Pop with maxSize 20. Should only pop task "a" because only other task
-	// (with Topic "2") now has size 30.
-	popped := tracker.PopTasks(20)
-	if len(popped) != 1 || popped[0].Data != "a" {
-		t.Fatal("Expected 1 task", popped[0], popped[1])
+	// Pop with target size 15. Should only pop task "a" because its Work
+	// is now 20 (was 10)
+	popped := tracker.PopTasks(15)
+	if len(popped) != 1 || popped[0].Data != "b" {
+		t.Fatal("Expected 1 task")
 	}
 	popped = tracker.PopTasks(30)
 	if len(popped) != 1 {
@@ -346,19 +381,19 @@ func TestReplaceActiveTask(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "a",
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 			Data:     "b",
 		},
 	}
 
 	// Push task "a"
-	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
+	tracker.PushTasks(tasks[0]) // Topic "1"
 
 	// Pop task "a". This makes the task active.
 	popped := tracker.PopTasks(10)
@@ -367,7 +402,7 @@ func TestReplaceActiveTask(t *testing.T) {
 	}
 
 	// Push task "b"
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "1"
+	tracker.PushTasks(tasks[1]) // Topic "1"
 
 	// Pop all tasks. Task "a" was active so task "b" should have been moved to
 	// the pending queue.
@@ -385,19 +420,19 @@ func TestReplaceActiveTaskNonPermissive(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "a",
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 			Data:     "b",
 		},
 	}
 
 	// Push task "a"
-	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
+	tracker.PushTasks(tasks[0]) // Topic "1"
 
 	// Pop task "a". This makes the task active.
 	popped := tracker.PopTasks(10)
@@ -406,7 +441,7 @@ func TestReplaceActiveTaskNonPermissive(t *testing.T) {
 	}
 
 	// Push task "b". Task merger is not permissive, so should ignore task "b".
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "1"
+	tracker.PushTasks(tasks[1]) // Topic "1"
 
 	// Pop all tasks.
 	popped = tracker.PopTasks(100)
@@ -423,25 +458,25 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "a",
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "b",
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "c",
 		},
 	}
 
 	// Push task "a"
-	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
+	tracker.PushTasks(tasks[0]) // Topic "1"
 
 	// Pop task "a". This makes the task active.
 	popped := tracker.PopTasks(10)
@@ -450,11 +485,11 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 	}
 
 	// Push task "b". Same Topic so should be added to the pending queue.
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "1"
+	tracker.PushTasks(tasks[1]) // Topic "1"
 
 	// Push task "c". Permissive task merger so should replace pending task "b"
 	// with same Topic.
-	tracker.PushTasks([]peertask.Task{tasks[2]}) // Topic "1"
+	tracker.PushTasks(tasks[2]) // Topic "1"
 
 	// Pop all tasks.
 	popped = tracker.PopTasks(100)
@@ -474,25 +509,25 @@ func TestRemoveActive(t *testing.T) {
 		peertask.Task{
 			Topic:    "1",
 			Priority: 10,
-			Size:     10,
+			Work:     10,
 			Data:     "a",
 		},
 		peertask.Task{
 			Topic:    "1",
 			Priority: 20,
-			Size:     10,
+			Work:     10,
 			Data:     "b",
 		},
 		peertask.Task{
 			Topic:    "2",
 			Priority: 15,
-			Size:     10,
+			Work:     10,
 			Data:     "c",
 		},
 	}
 
 	// Push task "a"
-	tracker.PushTasks([]peertask.Task{tasks[0]}) // Topic "1"
+	tracker.PushTasks(tasks[0]) // Topic "1"
 
 	// Pop task "a". This makes the task active.
 	popped := tracker.PopTasks(10)
@@ -501,8 +536,8 @@ func TestRemoveActive(t *testing.T) {
 	}
 
 	// Push task "b" and "c"
-	tracker.PushTasks([]peertask.Task{tasks[1]}) // Topic "1"
-	tracker.PushTasks([]peertask.Task{tasks[2]}) // Topic "2"
+	tracker.PushTasks(tasks[1]) // Topic "1"
+	tracker.PushTasks(tasks[2]) // Topic "2"
 
 	// Remove all tasks with Topic "1".
 	// This should remove task "b" from the pending queue.

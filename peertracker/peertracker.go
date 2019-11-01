@@ -41,9 +41,9 @@ type PeerTracker struct {
 	// Tasks that have been made active
 	activeTasks map[*peertask.Task]struct{}
 
-	// activeBytes must be locked around as it will be updated externally
-	activelk    sync.Mutex
-	activeBytes int
+	// activeWork must be locked around as it will be updated externally
+	activelk   sync.Mutex
+	activeWork int
 
 	// for the PQ interface
 	index int
@@ -91,16 +91,16 @@ func PeerCompare(a, b pq.Elem) bool {
 		return true
 	}
 
-	// If each peer has an equal amount of active data in its queue, choose the
-	// peer with the most amount of data waiting to send out
-	if pa.activeBytes == pb.activeBytes {
+	// If each peer has an equal amount of work in its active queue, choose the
+	// peer with the most amount of work pending
+	if pa.activeWork == pb.activeWork {
 		return paPending > pbPending
 	}
 
-	// Choose the peer with the least amount of active data in its queue.
+	// Choose the peer with the least amount of work in its active queue.
 	// This way we "keep peers busy" by sending them as much data as they can
 	// process.
-	return pa.activeBytes < pb.activeBytes
+	return pa.activeWork < pb.activeWork
 }
 
 // Target returns the peer that this peer tracker tracks tasks for
@@ -127,7 +127,7 @@ func (p *PeerTracker) SetIndex(i int) {
 }
 
 // PushTasks adds a group of tasks onto a peer's queue
-func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
+func (p *PeerTracker) PushTasks(tasks ...peertask.Task) {
 	now := time.Now()
 
 	p.activelk.Lock()
@@ -163,45 +163,27 @@ func (p *PeerTracker) PushTasks(tasks []peertask.Task) {
 	}
 }
 
-// PopTasks pops as many tasks as possible up to the given size off the queue
-// in priority order. Note that the first task is always popped, even if it's
-// over maxSize, so that large tasks don't block up the queue.
-func (p *PeerTracker) PopTasks(maxSize int) []*peertask.Task {
+// PopTasks pops as many tasks off the queue as necessary to cover
+// targetMinWork, in priority order. If there are not enough tasks to cover
+// targetMinWork it just returns whatever is in the queue.
+func (p *PeerTracker) PopTasks(targetMinWork int) []*peertask.Task {
 	var out []*peertask.Task
-	if maxSize <= 0 {
-		return out
-	}
-
-	size := 0
-	for p.taskQueue.Len() > 0 && p.freezeVal == 0 {
-		// Peek at the next task in the queue
-		t := p.taskQueue.Peek().(*peertask.QueueTask)
+	work := 0
+	for p.taskQueue.Len() > 0 && p.freezeVal == 0 && work < targetMinWork {
+		// Pop the next task off the queue
+		t := p.taskQueue.Pop().(*peertask.QueueTask)
 
 		// Ignore tasks that have been cancelled
 		task, ok := p.pendingTasks[t.Topic]
 		if !ok {
-			p.taskQueue.Pop()
 			continue
 		}
-
-		// We always pop the first task off the queue, even if it's bigger
-		// than the max size. This ensures that big tasks don't get stuck in
-		// the queue forever.
-		// After the first task, pop tasks if they fit under the max size.
-		if len(out) > 0 && size+task.Size > maxSize {
-			// We have as many tasks as we can fit into the message, so return
-			// the tasks
-			return out
-		}
-
-		// Pop the task off the queue
-		p.taskQueue.Pop()
 
 		// Start the task (this makes it "active")
 		p.startTask(&task.Task)
 
 		out = append(out, &task.Task)
-		size = size + task.Size
+		work += task.Work
 	}
 
 	return out
@@ -218,7 +200,7 @@ func (p *PeerTracker) startTask(task *peertask.Task) {
 	// Add task to active queue
 	if _, ok := p.activeTasks[task]; !ok {
 		p.activeTasks[task] = struct{}{}
-		p.activeBytes += task.Size
+		p.activeWork += task.Work
 	}
 }
 
@@ -230,8 +212,8 @@ func (p *PeerTracker) TaskDone(task *peertask.Task) {
 	// Remove task from active queue
 	if _, ok := p.activeTasks[task]; ok {
 		delete(p.activeTasks, task)
-		p.activeBytes -= task.Size
-		if p.activeBytes < 0 {
+		p.activeWork -= task.Work
+		if p.activeWork < 0 {
 			panic("more tasks finished than started!")
 		}
 	}

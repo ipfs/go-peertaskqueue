@@ -42,8 +42,10 @@ type Task struct {
 	Topic Topic
 	// Priority of the task
 	Priority int
-	// The size of the task - peers with bigger size queues are higher priority
-	Size int
+	// The size of the task
+	// - peers with most active work are deprioritized
+	// - peers with most pending work are prioritized
+	Work int
 	// Arbitrary data associated with this Task by the client
 	Data Data
 }

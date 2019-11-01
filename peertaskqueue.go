@@ -145,15 +145,19 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 		ptq.callHooks(to, peerAdded)
 	}
 
-	peerTracker.PushTasks(tasks)
+	peerTracker.PushTasks(tasks...)
 	ptq.pQueue.Update(peerTracker.Index())
 }
 
-// PopTasks pops the highest priority tasks from the peer off the queue, up to
-// the given maximum size of those tasks. Note that the first task is always
-// popped off the queue even if it's over maxSize, to prevent large tasks from
-// blocking up the queue.
-func (ptq *PeerTaskQueue) PopTasks(maxSize int) (peer.ID, []*peertask.Task) {
+// PopTasks finds the peer with the highest priority and pops as many tasks
+// off the peer's queue as necessary to cover targetMinWork, in priority order.
+// If there are not enough tasks to cover targetMinWork it just returns
+// whatever is in the peer's queue.
+// - Peers with the most "active" work are deprioritized.
+//   This heuristic is for fairness, we try to keep all peers "busy".
+// - Peers with the most "pending" work are prioritized.
+//   This heuristic is so that peers with a lot to do get asked for work first.
+func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
 
@@ -170,7 +174,7 @@ func (ptq *PeerTaskQueue) PopTasks(maxSize int) (peer.ID, []*peertask.Task) {
 	}
 
 	// Get the highest priority tasks for the given peer
-	out := peerTracker.PopTasks(maxSize)
+	out := peerTracker.PopTasks(targetMinWork)
 
 	// If the peer has no more tasks, remove its peer tracker
 	if peerTracker.IsIdle() {
