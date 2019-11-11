@@ -41,9 +41,10 @@ func TestPushPop(t *testing.T) {
 
 	for _, index := range rand.Perm(len(alphabet)) { // add blocks for all letters
 		letter := alphabet[index]
-		t.Log(partner.String())
+		t.Log(letter)
 
-		ptq.PushBlock(partner, peertask.Task{Identifier: letter, Priority: math.MaxInt32 - index})
+		// add tasks out of order, but with in-order priority
+		ptq.PushTasks(partner, peertask.Task{Topic: letter, Priority: math.MaxInt32 - index})
 	}
 	for _, consonant := range consonants {
 		ptq.Remove(consonant, partner)
@@ -53,13 +54,13 @@ func TestPushPop(t *testing.T) {
 
 	var out []string
 	for {
-		received := ptq.PopBlock()
-		if received == nil {
+		_, received, _ := ptq.PopTasks(100)
+		if len(received) == 0 {
 			break
 		}
 
-		for _, task := range received.Tasks {
-			out = append(out, task.Identifier.(string))
+		for _, task := range received {
+			out = append(out, task.Topic.(string))
 		}
 	}
 
@@ -79,14 +80,13 @@ func TestFreezeUnfreeze(t *testing.T) {
 	c := peers[2]
 	d := peers[3]
 
-	// Have each push some blocks
-
+	// Push 5 blocks to each peer
 	for i := 0; i < 5; i++ {
 		is := fmt.Sprint(i)
-		ptq.PushBlock(a, peertask.Task{Identifier: is})
-		ptq.PushBlock(b, peertask.Task{Identifier: is})
-		ptq.PushBlock(c, peertask.Task{Identifier: is})
-		ptq.PushBlock(d, peertask.Task{Identifier: is})
+		ptq.PushTasks(a, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(b, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(c, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(d, peertask.Task{Topic: is, Work: 1})
 	}
 
 	// now, pop off four tasks, there should be one from each
@@ -121,10 +121,10 @@ func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		is := fmt.Sprint(i)
-		ptq.PushBlock(a, peertask.Task{Identifier: is})
-		ptq.PushBlock(b, peertask.Task{Identifier: is})
-		ptq.PushBlock(c, peertask.Task{Identifier: is})
-		ptq.PushBlock(d, peertask.Task{Identifier: is})
+		ptq.PushTasks(a, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(b, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(c, peertask.Task{Topic: is, Work: 1})
+		ptq.PushTasks(d, peertask.Task{Topic: is, Work: 1})
 	}
 
 	// now, pop off four tasks, there should be one from each
@@ -132,45 +132,103 @@ func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
 
 	ptq.Remove("1", b)
 
-	// b should be frozen, causing it to get skipped in the rotation
+	// b should not be frozen, so it wont get skipped in the rotation
 	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
-
 }
 
-// This test checks that peers wont starve out other peers
-func TestPeerRepeats(t *testing.T) {
+// This test checks that ordering of peers is correct
+func TestPeerOrder(t *testing.T) {
 	ptq := New()
-	peers := testutil.GeneratePeers(4)
+	peers := testutil.GeneratePeers(3)
 	a := peers[0]
 	b := peers[1]
 	c := peers[2]
-	d := peers[3]
 
-	// Have each push some blocks
+	ptq.PushTasks(a, peertask.Task{Topic: "1", Work: 3, Priority: 2})
+	ptq.PushTasks(a, peertask.Task{Topic: "2", Work: 1, Priority: 1})
 
-	for i := 0; i < 5; i++ {
-		is := fmt.Sprint(i)
-		ptq.PushBlock(a, peertask.Task{Identifier: is})
-		ptq.PushBlock(b, peertask.Task{Identifier: is})
-		ptq.PushBlock(c, peertask.Task{Identifier: is})
-		ptq.PushBlock(d, peertask.Task{Identifier: is})
+	ptq.PushTasks(b, peertask.Task{Topic: "3", Work: 1, Priority: 3})
+	ptq.PushTasks(b, peertask.Task{Topic: "4", Work: 3, Priority: 2})
+	ptq.PushTasks(b, peertask.Task{Topic: "5", Work: 1, Priority: 1})
+
+	ptq.PushTasks(c, peertask.Task{Topic: "6", Work: 2, Priority: 2})
+	ptq.PushTasks(c, peertask.Task{Topic: "7", Work: 2, Priority: 1})
+
+	// All peers have nothing in their active queue, so equal chance of any
+	// peer being chosen
+	var ps []string
+	var ids []string
+	for i := 0; i < 3; i++ {
+		p, tasks, _ := ptq.PopTasks(1)
+		ps = append(ps, p.String())
+		ids = append(ids, fmt.Sprint(tasks[0].Topic))
+	}
+	matchArrays(t, ps, []string{a.String(), b.String(), c.String()})
+	matchArrays(t, ids, []string{"1", "3", "6"})
+
+	// Active queues:
+	// a: 3            Pending: [1]
+	// b: 1            Pending: [3, 1]
+	// c: 2            Pending: [2]
+	// So next peer should be b (least work in active queue)
+	p, tsk, pending := ptq.PopTasks(1)
+	if len(tsk) != 1 || p != b || tsk[0].Topic != "4" {
+		t.Fatal("Expected ID 4 from peer b")
+	}
+	if pending != 1 {
+		t.Fatal("Expected pending work to be 1")
 	}
 
-	// now, pop off four tasks, there should be one from each
-	tasks := matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+	// Active queues:
+	// a: 3            Pending: [1]
+	// b: 1 + 3        Pending: [1]
+	// c: 2            Pending: [2]
+	// So next peer should be c (least work in active queue)
+	p, tsk, pending = ptq.PopTasks(1)
+	if len(tsk) != 1 || p != c || tsk[0].Topic != "7" {
+		t.Fatal("Expected ID 7 from peer c")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
+	}
 
-	// Now, if one of the tasks gets finished, the next task off the queue should
-	// be for the same peer
-	for blockI := 0; blockI < 4; blockI++ {
-		for i := 0; i < 4; i++ {
-			// its okay to mark the same task done multiple times here (JUST FOR TESTING)
-			tasks[i].Done(tasks[i].Tasks)
+	// Active queues:
+	// a: 3            Pending: [1]
+	// b: 1 + 3        Pending: [1]
+	// c: 2 + 2
+	// So next peer should be a (least work in active queue)
+	p, tsk, pending = ptq.PopTasks(1)
+	if len(tsk) != 1 || p != a || tsk[0].Topic != "2" {
+		t.Fatal("Expected ID 2 from peer a")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
+	}
 
-			ntask := ptq.PopBlock()
-			if ntask.Target != tasks[i].Target {
-				t.Fatal("Expected task from peer with lowest active count")
-			}
-		}
+	// Active queues:
+	// a: 3 + 1
+	// b: 1 + 3        Pending: [1]
+	// c: 2 + 2
+	// a & c have no more pending tasks, so next peer should be b
+	p, tsk, pending = ptq.PopTasks(1)
+	if len(tsk) != 1 || p != b || tsk[0].Topic != "5" {
+		t.Fatal("Expected ID 5 from peer b")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
+	}
+
+	// Active queues:
+	// a: 3 + 1
+	// b: 1 + 3 + 1
+	// c: 2 + 2
+	// No more pending tasks, so next pop should return nothing
+	_, tsk, pending = ptq.PopTasks(1)
+	if len(tsk) != 0 {
+		t.Fatal("Expected no more tasks")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
 	}
 }
 
@@ -187,8 +245,8 @@ func TestHooks(t *testing.T) {
 	peers := testutil.GeneratePeers(2)
 	a := peers[0]
 	b := peers[1]
-	ptq.PushBlock(a, peertask.Task{Identifier: "1"})
-	ptq.PushBlock(b, peertask.Task{Identifier: "2"})
+	ptq.PushTasks(a, peertask.Task{Topic: "1"})
+	ptq.PushTasks(b, peertask.Task{Topic: "2"})
 	expected := []string{a.Pretty(), b.Pretty()}
 	sort.Strings(expected)
 	sort.Strings(peersAdded)
@@ -201,12 +259,12 @@ func TestHooks(t *testing.T) {
 		}
 	}
 
-	task := ptq.PopBlock()
-	task.Done(task.Tasks)
-	task = ptq.PopBlock()
-	task.Done(task.Tasks)
-	ptq.PopBlock()
-	ptq.PopBlock()
+	p, task, _ := ptq.PopTasks(100)
+	ptq.TasksDone(p, task...)
+	p, task, _ = ptq.PopTasks(100)
+	ptq.TasksDone(p, task...)
+	ptq.PopTasks(100)
+	ptq.PopTasks(100)
 
 	sort.Strings(peersRemoved)
 	if len(peersRemoved) != len(expected) {
@@ -218,6 +276,7 @@ func TestHooks(t *testing.T) {
 		}
 	}
 }
+
 func TestCleaningUpQueues(t *testing.T) {
 	ptq := New()
 
@@ -225,51 +284,57 @@ func TestCleaningUpQueues(t *testing.T) {
 	var peerTasks []peertask.Task
 	for i := 0; i < 5; i++ {
 		is := fmt.Sprint(i)
-		peerTasks = append(peerTasks, peertask.Task{Identifier: is})
+		peerTasks = append(peerTasks, peertask.Task{Topic: is})
 	}
 
 	// push a block, pop a block, complete everything, should be removed
-	ptq.PushBlock(peer, peerTasks...)
-	task := ptq.PopBlock()
-	task.Done(task.Tasks)
-	task = ptq.PopBlock()
+	ptq.PushTasks(peer, peerTasks...)
+	p, task, _ := ptq.PopTasks(100)
+	ptq.TasksDone(p, task...)
+	_, task, _ = ptq.PopTasks(100)
 
-	if task != nil || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
+	if len(task) != 0 || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
 		t.Fatal("PeerTracker should have been removed because it's idle")
 	}
 
 	// push a block, remove each of its entries, should be removed
-	ptq.PushBlock(peer, peerTasks...)
+	ptq.PushTasks(peer, peerTasks...)
 	for _, peerTask := range peerTasks {
-		ptq.Remove(peerTask.Identifier, peer)
+		ptq.Remove(peerTask.Topic, peer)
 	}
-	task = ptq.PopBlock()
+	_, task, _ = ptq.PopTasks(100)
 
-	if task != nil || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
+	if len(task) != 0 || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
 		t.Fatal("Partner should have been removed because it's idle")
 	}
-
 }
 
-func matchNTasks(t *testing.T, ptq *PeerTaskQueue, n int, expected ...string) []*peertask.TaskBlock {
+func matchNTasks(t *testing.T, ptq *PeerTaskQueue, n int, expected ...string) {
 	var targets []string
-	var tasks []*peertask.TaskBlock
 	for i := 0; i < n; i++ {
-		t := ptq.PopBlock()
-		targets = append(targets, t.Target.Pretty())
-		tasks = append(tasks, t)
+		p, tsk, _ := ptq.PopTasks(1)
+		if len(tsk) != 1 {
+			t.Fatal("expected 1 task at a time")
+		}
+		targets = append(targets, p.Pretty())
 	}
 
-	sort.Strings(expected)
-	sort.Strings(targets)
+	matchArrays(t, expected, targets)
+}
 
-	t.Log(targets)
-	t.Log(expected)
-	for i, s := range targets {
-		if expected[i] != s {
-			t.Fatal("unexpected peer", s, expected[i])
+func matchArrays(t *testing.T, str1, str2 []string) {
+	if len(str1) != len(str2) {
+		t.Fatal("array lengths did not match", str1, str2)
+	}
+
+	sort.Strings(str1)
+	sort.Strings(str2)
+
+	t.Log(str1)
+	t.Log(str2)
+	for i, s := range str2 {
+		if str1[i] != s {
+			t.Fatal("unexpected peer", s, str1[i])
 		}
 	}
-
-	return tasks
 }
