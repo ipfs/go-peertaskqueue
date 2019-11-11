@@ -54,7 +54,7 @@ func TestPushPop(t *testing.T) {
 
 	var out []string
 	for {
-		_, received := ptq.PopTasks(100)
+		_, received, _ := ptq.PopTasks(100)
 		if len(received) == 0 {
 			break
 		}
@@ -159,7 +159,7 @@ func TestPeerOrder(t *testing.T) {
 	var ps []string
 	var ids []string
 	for i := 0; i < 3; i++ {
-		p, tasks := ptq.PopTasks(1)
+		p, tasks, _ := ptq.PopTasks(1)
 		ps = append(ps, p.String())
 		ids = append(ids, fmt.Sprint(tasks[0].Topic))
 	}
@@ -171,9 +171,12 @@ func TestPeerOrder(t *testing.T) {
 	// b: 1            Pending: [3, 1]
 	// c: 2            Pending: [2]
 	// So next peer should be b (least work in active queue)
-	p, tsk := ptq.PopTasks(1)
+	p, tsk, pending := ptq.PopTasks(1)
 	if len(tsk) != 1 || p != b || tsk[0].Topic != "4" {
 		t.Fatal("Expected ID 4 from peer b")
+	}
+	if pending != 1 {
+		t.Fatal("Expected pending work to be 1")
 	}
 
 	// Active queues:
@@ -181,9 +184,12 @@ func TestPeerOrder(t *testing.T) {
 	// b: 1 + 3        Pending: [1]
 	// c: 2            Pending: [2]
 	// So next peer should be c (least work in active queue)
-	p, tsk = ptq.PopTasks(1)
+	p, tsk, pending = ptq.PopTasks(1)
 	if len(tsk) != 1 || p != c || tsk[0].Topic != "7" {
 		t.Fatal("Expected ID 7 from peer c")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
 	}
 
 	// Active queues:
@@ -191,9 +197,12 @@ func TestPeerOrder(t *testing.T) {
 	// b: 1 + 3        Pending: [1]
 	// c: 2 + 2
 	// So next peer should be a (least work in active queue)
-	p, tsk = ptq.PopTasks(1)
+	p, tsk, pending = ptq.PopTasks(1)
 	if len(tsk) != 1 || p != a || tsk[0].Topic != "2" {
 		t.Fatal("Expected ID 2 from peer a")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
 	}
 
 	// Active queues:
@@ -201,9 +210,12 @@ func TestPeerOrder(t *testing.T) {
 	// b: 1 + 3        Pending: [1]
 	// c: 2 + 2
 	// a & c have no more pending tasks, so next peer should be b
-	p, tsk = ptq.PopTasks(1)
+	p, tsk, pending = ptq.PopTasks(1)
 	if len(tsk) != 1 || p != b || tsk[0].Topic != "5" {
 		t.Fatal("Expected ID 5 from peer b")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
 	}
 
 	// Active queues:
@@ -211,9 +223,12 @@ func TestPeerOrder(t *testing.T) {
 	// b: 1 + 3 + 1
 	// c: 2 + 2
 	// No more pending tasks, so next pop should return nothing
-	_, tsk = ptq.PopTasks(1)
+	_, tsk, pending = ptq.PopTasks(1)
 	if len(tsk) != 0 {
 		t.Fatal("Expected no more tasks")
+	}
+	if pending != 0 {
+		t.Fatal("Expected pending work to be 0")
 	}
 }
 
@@ -244,9 +259,9 @@ func TestHooks(t *testing.T) {
 		}
 	}
 
-	p, task := ptq.PopTasks(100)
+	p, task, _ := ptq.PopTasks(100)
 	ptq.TasksDone(p, task...)
-	p, task = ptq.PopTasks(100)
+	p, task, _ = ptq.PopTasks(100)
 	ptq.TasksDone(p, task...)
 	ptq.PopTasks(100)
 	ptq.PopTasks(100)
@@ -274,9 +289,9 @@ func TestCleaningUpQueues(t *testing.T) {
 
 	// push a block, pop a block, complete everything, should be removed
 	ptq.PushTasks(peer, peerTasks...)
-	p, task := ptq.PopTasks(100)
+	p, task, _ := ptq.PopTasks(100)
 	ptq.TasksDone(p, task...)
-	_, task = ptq.PopTasks(100)
+	_, task, _ = ptq.PopTasks(100)
 
 	if len(task) != 0 || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
 		t.Fatal("PeerTracker should have been removed because it's idle")
@@ -287,18 +302,17 @@ func TestCleaningUpQueues(t *testing.T) {
 	for _, peerTask := range peerTasks {
 		ptq.Remove(peerTask.Topic, peer)
 	}
-	_, task = ptq.PopTasks(100)
+	_, task, _ = ptq.PopTasks(100)
 
 	if len(task) != 0 || len(ptq.peerTrackers) > 0 || ptq.pQueue.Len() > 0 {
 		t.Fatal("Partner should have been removed because it's idle")
 	}
-
 }
 
 func matchNTasks(t *testing.T, ptq *PeerTaskQueue, n int, expected ...string) {
 	var targets []string
 	for i := 0; i < n; i++ {
-		p, tsk := ptq.PopTasks(1)
+		p, tsk, _ := ptq.PopTasks(1)
 		if len(tsk) != 1 {
 			t.Fatal("expected 1 task at a time")
 		}

@@ -166,7 +166,9 @@ func (p *PeerTracker) PushTasks(tasks ...peertask.Task) {
 // PopTasks pops as many tasks off the queue as necessary to cover
 // targetMinWork, in priority order. If there are not enough tasks to cover
 // targetMinWork it just returns whatever is in the queue.
-func (p *PeerTracker) PopTasks(targetMinWork int) []*peertask.Task {
+// The second response argument is pending work: the amount of work in the
+// queue for this peer.
+func (p *PeerTracker) PopTasks(targetMinWork int) ([]*peertask.Task, int) {
 	var out []*peertask.Task
 	work := 0
 	for p.taskQueue.Len() > 0 && p.freezeVal == 0 && work < targetMinWork {
@@ -180,7 +182,7 @@ func (p *PeerTracker) PopTasks(targetMinWork int) []*peertask.Task {
 		work += t.Work
 	}
 
-	return out
+	return out, p.getPendingWork()
 }
 
 // startTask signals that a task was started for this peer.
@@ -196,6 +198,14 @@ func (p *PeerTracker) startTask(task *peertask.Task) {
 		p.activeTasks[task] = struct{}{}
 		p.activeWork += task.Work
 	}
+}
+
+func (p *PeerTracker) getPendingWork() int {
+	total := 0
+	for _, t := range p.pendingTasks {
+		total += t.Work
+	}
+	return total
 }
 
 // TaskDone signals that a task was completed for this peer.

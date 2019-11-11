@@ -157,12 +157,14 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 //   This heuristic is for fairness, we try to keep all peers "busy".
 // - Peers with the most "pending" work are prioritized.
 //   This heuristic is so that peers with a lot to do get asked for work first.
-func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task) {
+// The third response argument is pending work: the amount of work in the
+// queue for this peer.
+func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task, int) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
 
 	if ptq.pQueue.Len() == 0 {
-		return "", nil
+		return "", nil, -1
 	}
 
 	var peerTracker *peertracker.PeerTracker
@@ -170,11 +172,11 @@ func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task
 	// Choose the highest priority peer
 	peerTracker = ptq.pQueue.Peek().(*peertracker.PeerTracker)
 	if peerTracker == nil {
-		return "", nil
+		return "", nil, -1
 	}
 
 	// Get the highest priority tasks for the given peer
-	out := peerTracker.PopTasks(targetMinWork)
+	out, pendingWork := peerTracker.PopTasks(targetMinWork)
 
 	// If the peer has no more tasks, remove its peer tracker
 	if peerTracker.IsIdle() {
@@ -189,7 +191,7 @@ func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task
 		ptq.pQueue.Update(peerTracker.Index())
 	}
 
-	return peerTracker.Target(), out
+	return peerTracker.Target(), out, pendingWork
 }
 
 // TasksDone is called to indicate that the given tasks have completed
