@@ -23,13 +23,14 @@ type hookFunc func(p peer.ID, event peerTaskQueueEvent)
 // to execute the block with the highest priority, or otherwise the one added
 // first if priorities are equal.
 type PeerTaskQueue struct {
-	lock           sync.Mutex
-	pQueue         pq.PQ
-	peerTrackers   map[peer.ID]*peertracker.PeerTracker
-	frozenPeers    map[peer.ID]struct{}
-	hooks          []hookFunc
-	ignoreFreezing bool
-	taskMerger     peertracker.TaskMerger
+	lock                      sync.Mutex
+	pQueue                    pq.PQ
+	peerTrackers              map[peer.ID]*peertracker.PeerTracker
+	frozenPeers               map[peer.ID]struct{}
+	hooks                     []hookFunc
+	ignoreFreezing            bool
+	taskMerger                peertracker.TaskMerger
+	maxOutstandingWorkPerPeer int
 }
 
 // Option is a function that configures the peer task queue
@@ -59,6 +60,16 @@ func TaskMerger(tmfp peertracker.TaskMerger) Option {
 		previous := ptq.taskMerger
 		ptq.taskMerger = tmfp
 		return TaskMerger(previous)
+	}
+}
+
+// MaxOutstandingWorkPerPeer is an option that specifies how many tasks a peer can have outstanding
+// with the same Topic as an existing Topic.
+func MaxOutstandingWorkPerPeer(count int) Option {
+	return func(ptq *PeerTaskQueue) Option {
+		previous := ptq.maxOutstandingWorkPerPeer
+		ptq.maxOutstandingWorkPerPeer = count
+		return MaxOutstandingWorkPerPeer(previous)
 	}
 }
 
@@ -139,7 +150,7 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 
 	peerTracker, ok := ptq.peerTrackers[to]
 	if !ok {
-		peerTracker = peertracker.New(to, ptq.taskMerger)
+		peerTracker = peertracker.New(to, ptq.taskMerger, ptq.maxOutstandingWorkPerPeer)
 		ptq.pQueue.Push(peerTracker)
 		ptq.peerTrackers[to] = peerTracker
 		ptq.callHooks(to, peerAdded)
