@@ -45,6 +45,8 @@ type PeerTracker struct {
 	activelk   sync.Mutex
 	activeWork int
 
+	maxActiveWorkPerPeer int
+
 	// for the PQ interface
 	index int
 
@@ -57,13 +59,14 @@ type PeerTracker struct {
 }
 
 // New creates a new PeerTracker
-func New(target peer.ID, taskMerger TaskMerger) *PeerTracker {
+func New(target peer.ID, taskMerger TaskMerger, maxActiveWorkPerPeer int) *PeerTracker {
 	return &PeerTracker{
-		target:       target,
-		taskQueue:    pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
-		pendingTasks: make(map[peertask.Topic]*peertask.QueueTask),
-		activeTasks:  make(map[*peertask.Task]struct{}),
-		taskMerger:   taskMerger,
+		target:               target,
+		taskQueue:            pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
+		pendingTasks:         make(map[peertask.Topic]*peertask.QueueTask),
+		activeTasks:          make(map[*peertask.Task]struct{}),
+		taskMerger:           taskMerger,
+		maxActiveWorkPerPeer: maxActiveWorkPerPeer,
 	}
 }
 
@@ -172,6 +175,16 @@ func (p *PeerTracker) PopTasks(targetMinWork int) ([]*peertask.Task, int) {
 	var out []*peertask.Task
 	work := 0
 	for p.taskQueue.Len() > 0 && p.freezeVal == 0 && work < targetMinWork {
+		if p.maxActiveWorkPerPeer > 0 {
+			// Do not add work to a peer that is already maxed out
+			p.activelk.Lock()
+			activeWork := p.activeWork
+			p.activelk.Unlock()
+			if activeWork >= p.maxActiveWorkPerPeer {
+				break
+			}
+		}
+
 		// Pop the next task off the queue
 		t := p.taskQueue.Pop().(*peertask.QueueTask)
 
