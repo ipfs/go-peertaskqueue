@@ -22,7 +22,7 @@ func TestPushPop(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 1,
 			Work:     10,
@@ -43,7 +43,7 @@ func TestPopNegativeOrZeroSize(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 1,
 			Work:     10,
@@ -65,17 +65,17 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 		},
-		peertask.Task{
+		{
 			Topic:    "2",
 			Priority: 20,
 			Work:     10,
 		},
-		peertask.Task{
+		{
 			Topic:    "3",
 			Priority: 15,
 			Work:     10,
@@ -119,12 +119,12 @@ func TestPopFirstItemAlways(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     10,
 		},
-		peertask.Task{
+		{
 			Topic:    "2",
 			Priority: 10,
 			Work:     5,
@@ -150,17 +150,17 @@ func TestPopItemsToCoverTargetWork(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     5,
 		},
-		peertask.Task{
+		{
 			Topic:    "2",
 			Priority: 10,
 			Work:     5,
 		},
-		peertask.Task{
+		{
 			Topic:    "3",
 			Priority: 5,
 			Work:     5,
@@ -186,17 +186,17 @@ func TestRemove(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 		},
-		peertask.Task{
+		{
 			Topic:    "2",
 			Priority: 20,
 			Work:     10,
 		},
-		peertask.Task{
+		{
 			Topic:    "3",
 			Priority: 15,
 			Work:     10,
@@ -218,17 +218,17 @@ func TestRemoveMulti(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     1,
 		},
-		peertask.Task{
+		{
 			Topic:    "2",
 			Priority: 15,
 			Work:     10,
@@ -250,13 +250,13 @@ func TestTaskDone(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "a",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     10,
@@ -302,13 +302,13 @@ func TestReplaceTaskPermissive(t *testing.T) {
 	tracker := New(partner, &permissiveTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "a",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     10,
@@ -341,19 +341,19 @@ func TestReplaceTaskSize(t *testing.T) {
 	tracker := New(partner, &permissiveTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "a",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     20,
 			Data:     "b",
 		},
-		peertask.Task{
+		{
 			Topic:    "2",
 			Priority: 5,
 			Work:     5,
@@ -394,13 +394,13 @@ func TestReplaceActiveTask(t *testing.T) {
 	tracker := New(partner, &permissiveTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "a",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     10,
@@ -433,13 +433,13 @@ func TestReplaceActiveTaskNonPermissive(t *testing.T) {
 	tracker := New(partner, &DefaultTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "a",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     10,
@@ -471,19 +471,19 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 	tracker := New(partner, &permissiveTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "a",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "b",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
@@ -522,19 +522,19 @@ func TestRemoveActive(t *testing.T) {
 	tracker := New(partner, &permissiveTaskMerger{})
 
 	tasks := []peertask.Task{
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 10,
 			Work:     10,
 			Data:     "a",
 		},
-		peertask.Task{
+		{
 			Topic:    "1",
 			Priority: 20,
 			Work:     10,
 			Data:     "b",
 		},
-		peertask.Task{
+		{
 			Topic:    "2",
 			Priority: 15,
 			Work:     10,
