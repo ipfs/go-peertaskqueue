@@ -6,7 +6,7 @@ import (
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/peertracker"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 type peerTaskQueueEvent int
@@ -167,10 +167,8 @@ func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task
 		return "", nil, -1
 	}
 
-	var peerTracker *peertracker.PeerTracker
-
 	// Choose the highest priority peer
-	peerTracker = ptq.pQueue.Peek().(*peertracker.PeerTracker)
+	peerTracker := ptq.pQueue.Peek().(*peertracker.PeerTracker)
 	if peerTracker == nil {
 		return "", nil, -1
 	}
