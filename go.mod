@@ -1,6 +1,6 @@
 module github.com/ipfs/go-peertaskqueue
 
-go 1.12
+go 1.15
 
 require (
 	github.com/ipfs/go-ipfs-pq v0.0.2
