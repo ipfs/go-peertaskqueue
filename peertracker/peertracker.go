@@ -119,6 +119,19 @@ func (p *PeerTracker) IsIdle() bool {
 	return len(p.pendingTasks) == 0 && len(p.activeTasks) == 0
 }
 
+// PeerTrackerStats captures number of active and pending tasks for this peer.
+type PeerTrackerStats struct {
+	NumPending int
+	NumActive  int
+}
+
+// Stats returns current statistics for this peer.
+func (p *PeerTracker) Stats() *PeerTrackerStats {
+	p.activelk.Lock()
+	defer p.activelk.Unlock()
+	return &PeerTrackerStats{NumPending: len(p.pendingTasks), NumActive: len(p.activeTasks)}
+}
+
 // Index implements pq.Elem.
 func (p *PeerTracker) Index() int {
 	return p.index

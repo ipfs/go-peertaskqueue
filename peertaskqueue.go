@@ -143,6 +143,27 @@ func (ptq *PeerTaskQueue) callHooks(to peer.ID, event peerTaskQueueEvent) {
 	}
 }
 
+// PeerTaskQueueStats captures current stats about the task queue.
+type PeerTaskQueueStats struct {
+	NumPeers   int
+	NumActive  int
+	NumPending int
+}
+
+// Stats returns current stats about the task queue.
+func (ptq *PeerTaskQueue) Stats() *PeerTaskQueueStats {
+	ptq.lock.Lock()
+	defer ptq.lock.Unlock()
+
+	s := &PeerTaskQueueStats{NumPeers: len(ptq.peerTrackers)}
+	for _, t := range ptq.peerTrackers {
+		ts := t.Stats()
+		s.NumActive += ts.NumActive
+		s.NumPending += ts.NumPending
+	}
+	return s
+}
+
 // PushTasks adds a new group of tasks for the given peer to the queue
 func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 	ptq.lock.Lock()
