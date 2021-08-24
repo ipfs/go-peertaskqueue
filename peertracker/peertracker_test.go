@@ -576,9 +576,9 @@ func TestPushPopEqualTaskPriorities(t *testing.T) {
 	clock := clock.NewMock()
 	oldClock := clockInstance
 	clockInstance = clock
-	defer func() {
+	t.Cleanup(func() {
 		clockInstance = oldClock
-	}()
+	})
 	tracker := New(partner, &DefaultTaskMerger{}, 1)
 
 	tasks := []peertask.Task{
