@@ -2,7 +2,9 @@ package peertracker
 
 import (
 	"testing"
+	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/testutil"
 )
@@ -566,5 +568,62 @@ func TestRemoveActive(t *testing.T) {
 	}
 	if popped[0].Topic != "2" {
 		t.Fatal("Expected tasks in order")
+	}
+}
+
+func TestPushPopEqualTaskPriorities(t *testing.T) {
+	partner := testutil.GeneratePeers(1)[0]
+	clock := clock.NewMock()
+	oldClock := clockInstance
+	clockInstance = clock
+	t.Cleanup(func() {
+		clockInstance = oldClock
+	})
+	tracker := New(partner, &DefaultTaskMerger{}, 1)
+
+	tasks := []peertask.Task{
+		{
+			Topic:    "1",
+			Priority: 10,
+			Work:     1,
+		},
+		{
+			Topic:    "2",
+			Priority: 10,
+			Work:     1,
+		},
+		{
+			Topic:    "3",
+			Priority: 10,
+			Work:     1,
+		},
+	}
+	tracker.PushTasks(tasks[0])
+	clock.Add(10 * time.Millisecond)
+	tracker.PushTasks(tasks[1])
+	clock.Add(10 * time.Millisecond)
+	tracker.PushTasks(tasks[2])
+	popped, _ := tracker.PopTasks(1)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
+	}
+	if popped[0].Topic != "1" {
+		t.Fatal("Expected first task")
+	}
+	tracker.TaskDone(popped[0])
+	popped, _ = tracker.PopTasks(1)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
+	}
+	if popped[0].Topic != "2" {
+		t.Fatal("Expected second task")
+	}
+	tracker.TaskDone(popped[0])
+	popped, _ = tracker.PopTasks(1)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
+	}
+	if popped[0].Topic != "3" {
+		t.Fatal("Expected third task")
 	}
 }

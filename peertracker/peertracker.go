@@ -2,12 +2,14 @@ package peertracker
 
 import (
 	"sync"
-	"time"
 
+	"github.com/benbjohnson/clock"
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
+
+var clockInstance = clock.New()
 
 // TaskMerger is an interface that is used to merge new tasks into the active
 // and pending queues
@@ -144,7 +146,7 @@ func (p *PeerTracker) SetIndex(i int) {
 
 // PushTasks adds a group of tasks onto a peer's queue
 func (p *PeerTracker) PushTasks(tasks ...peertask.Task) {
-	now := time.Now()
+	now := clockInstance.Now()
 
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
