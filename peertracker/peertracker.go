@@ -9,6 +9,8 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
+var clockInstance = clock.New()
+
 // TaskMerger is an interface that is used to merge new tasks into the active
 // and pending queues
 type TaskMerger interface {
@@ -36,7 +38,6 @@ func (*DefaultTaskMerger) Merge(task peertask.Task, existing *peertask.Task) {
 type PeerTracker struct {
 	target peer.ID
 
-	clock clock.Clock
 	// Tasks that are pending being made active
 	pendingTasks map[peertask.Topic]*peertask.QueueTask
 	// Tasks that have been made active
@@ -60,7 +61,7 @@ type PeerTracker struct {
 }
 
 // New creates a new PeerTracker
-func New(target peer.ID, taskMerger TaskMerger, maxActiveWorkPerPeer int, clock clock.Clock) *PeerTracker {
+func New(target peer.ID, taskMerger TaskMerger, maxActiveWorkPerPeer int) *PeerTracker {
 	return &PeerTracker{
 		target:               target,
 		taskQueue:            pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
@@ -68,7 +69,6 @@ func New(target peer.ID, taskMerger TaskMerger, maxActiveWorkPerPeer int, clock 
 		activeTasks:          make(map[*peertask.Task]struct{}),
 		taskMerger:           taskMerger,
 		maxActiveWorkPerPeer: maxActiveWorkPerPeer,
-		clock:                clock,
 	}
 }
 
@@ -146,7 +146,7 @@ func (p *PeerTracker) SetIndex(i int) {
 
 // PushTasks adds a group of tasks onto a peer's queue
 func (p *PeerTracker) PushTasks(tasks ...peertask.Task) {
-	now := p.clock.Now()
+	now := clockInstance.Now()
 
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
