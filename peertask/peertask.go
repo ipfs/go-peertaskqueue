@@ -15,7 +15,7 @@ var FIFOCompare = func(a, b *QueueTask) bool {
 // PriorityCompare respects the target peer's task priority. For tasks involving
 // different peers, the oldest task is prioritized.
 var PriorityCompare = func(a, b *QueueTask) bool {
-	if a.Target == b.Target {
+	if a.Target == b.Target && a.Priority != b.Priority {
 		return a.Priority > b.Priority
 	}
 	return FIFOCompare(a, b)

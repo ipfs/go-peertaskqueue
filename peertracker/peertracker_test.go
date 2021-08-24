@@ -2,7 +2,9 @@ package peertracker
 
 import (
 	"testing"
+	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/testutil"
 )
@@ -11,7 +13,7 @@ const testMaxActiveWorkPerPeer = 100
 
 func TestEmpty(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks, _ := tracker.PopTasks(100)
 	if len(tasks) != 0 {
@@ -21,7 +23,7 @@ func TestEmpty(t *testing.T) {
 
 func TestPushPop(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -42,7 +44,7 @@ func TestPushPop(t *testing.T) {
 
 func TestPopNegativeOrZeroSize(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -64,7 +66,7 @@ func TestPopNegativeOrZeroSize(t *testing.T) {
 
 func TestPushPopSizeAndOrder(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -118,7 +120,7 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 
 func TestPopFirstItemAlways(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -149,7 +151,7 @@ func TestPopFirstItemAlways(t *testing.T) {
 
 func TestPopItemsToCoverTargetWork(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -185,7 +187,7 @@ func TestPopItemsToCoverTargetWork(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -217,7 +219,7 @@ func TestRemove(t *testing.T) {
 
 func TestRemoveMulti(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -249,7 +251,7 @@ func TestRemoveMulti(t *testing.T) {
 
 func TestTaskDone(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -301,7 +303,7 @@ func (*permissiveTaskMerger) Merge(task peertask.Task, existing *peertask.Task) 
 
 func TestReplaceTaskPermissive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -340,7 +342,7 @@ func TestReplaceTaskPermissive(t *testing.T) {
 
 func TestReplaceTaskSize(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -393,7 +395,7 @@ func TestReplaceTaskSize(t *testing.T) {
 
 func TestReplaceActiveTask(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -432,7 +434,7 @@ func TestReplaceActiveTask(t *testing.T) {
 
 func TestReplaceActiveTaskNonPermissive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -470,7 +472,7 @@ func TestReplaceActiveTaskNonPermissive(t *testing.T) {
 
 func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -521,7 +523,7 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 
 func TestRemoveActive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer, clock.New())
 
 	tasks := []peertask.Task{
 		{
@@ -566,5 +568,57 @@ func TestRemoveActive(t *testing.T) {
 	}
 	if popped[0].Topic != "2" {
 		t.Fatal("Expected tasks in order")
+	}
+}
+
+func TestPushPopEqualTaskPriorities(t *testing.T) {
+	partner := testutil.GeneratePeers(1)[0]
+	clock := clock.NewMock()
+	tracker := New(partner, &DefaultTaskMerger{}, 1, clock)
+
+	tasks := []peertask.Task{
+		{
+			Topic:    "1",
+			Priority: 10,
+			Work:     1,
+		},
+		{
+			Topic:    "2",
+			Priority: 10,
+			Work:     1,
+		},
+		{
+			Topic:    "3",
+			Priority: 10,
+			Work:     1,
+		},
+	}
+	tracker.PushTasks(tasks[0])
+	clock.Add(10 * time.Millisecond)
+	tracker.PushTasks(tasks[1])
+	clock.Add(10 * time.Millisecond)
+	tracker.PushTasks(tasks[2])
+	popped, _ := tracker.PopTasks(1)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
+	}
+	if popped[0].Topic != "1" {
+		t.Fatal("Expected first task")
+	}
+	tracker.TaskDone(popped[0])
+	popped, _ = tracker.PopTasks(1)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
+	}
+	if popped[0].Topic != "2" {
+		t.Fatal("Expected second task")
+	}
+	tracker.TaskDone(popped[0])
+	popped, _ = tracker.PopTasks(1)
+	if len(popped) != 1 {
+		t.Fatal("Expected 1 task")
+	}
+	if popped[0].Topic != "3" {
+		t.Fatal("Expected third task")
 	}
 }

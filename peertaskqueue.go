@@ -3,6 +3,7 @@ package peertaskqueue
 import (
 	"sync"
 
+	"github.com/benbjohnson/clock"
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/peertracker"
@@ -171,7 +172,7 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 
 	peerTracker, ok := ptq.peerTrackers[to]
 	if !ok {
-		peerTracker = peertracker.New(to, ptq.taskMerger, ptq.maxOutstandingWorkPerPeer)
+		peerTracker = peertracker.New(to, ptq.taskMerger, ptq.maxOutstandingWorkPerPeer, clock.New())
 		ptq.pQueue.Push(peerTracker)
 		ptq.peerTrackers[to] = peerTracker
 		ptq.callHooks(to, peerAdded)
