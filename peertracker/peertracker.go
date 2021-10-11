@@ -54,30 +54,51 @@ type PeerTracker struct {
 
 	freezeVal int
 
+	queueTaskComparator peertask.QueueTaskComparator
+
 	// priority queue of tasks belonging to this peer
 	taskQueue pq.PQ
 
 	taskMerger TaskMerger
 }
 
+// Option is a function that configures the peer tracker
+type Option func(*PeerTracker)
+
+// WithQueueTaskComparator sets a custom QueueTask comparison function for the
+// peer tracker's task queue.
+func WithQueueTaskComparator(f peertask.QueueTaskComparator) Option {
+	return func(pt *PeerTracker) {
+		pt.queueTaskComparator = f
+	}
+}
+
 // New creates a new PeerTracker
-func New(target peer.ID, taskMerger TaskMerger, maxActiveWorkPerPeer int) *PeerTracker {
-	return &PeerTracker{
+func New(target peer.ID, taskMerger TaskMerger, maxActiveWorkPerPeer int, opts ...Option) *PeerTracker {
+	pt := &PeerTracker{
 		target:               target,
-		taskQueue:            pq.New(peertask.WrapCompare(peertask.PriorityCompare)),
+		queueTaskComparator:  peertask.PriorityCompare,
 		pendingTasks:         make(map[peertask.Topic]*peertask.QueueTask),
 		activeTasks:          make(map[*peertask.Task]struct{}),
 		taskMerger:           taskMerger,
 		maxActiveWorkPerPeer: maxActiveWorkPerPeer,
 	}
+
+	for _, opt := range opts {
+		opt(pt)
+	}
+
+	pt.taskQueue = pq.New(peertask.WrapCompare(pt.queueTaskComparator))
+
+	return pt
 }
 
-// PeerCompare implements pq.ElemComparator
-// returns true if peer 'a' has higher priority than peer 'b'
-func PeerCompare(a, b pq.Elem) bool {
-	pa := a.(*PeerTracker)
-	pb := b.(*PeerTracker)
+// PeerComparator is used for peer prioritization.
+// It should return true if peer 'a' has higher priority than peer 'b'
+type PeerComparator func(a, b *PeerTracker) bool
 
+// DefaultPeerComparator implements the default peer prioritization logic.
+func DefaultPeerComparator(pa, pb *PeerTracker) bool {
 	// having no pending tasks means lowest priority
 	paPending := len(pa.pendingTasks)
 	pbPending := len(pb.pendingTasks)
@@ -106,6 +127,22 @@ func PeerCompare(a, b pq.Elem) bool {
 	// This way we "keep peers busy" by sending them as much data as they can
 	// process.
 	return pa.activeWork < pb.activeWork
+}
+
+// TaskPriorityPeerComparator prioritizes peers based on their highest priority task.
+func TaskPriorityPeerComparator(comparator peertask.QueueTaskComparator) PeerComparator {
+	return func(pa, pb *PeerTracker) bool {
+		ta := pa.taskQueue.Peek()
+		tb := pb.taskQueue.Peek()
+		if ta == nil {
+			return false
+		}
+		if tb == nil {
+			return true
+		}
+
+		return comparator(ta.(*peertask.QueueTask), tb.(*peertask.QueueTask))
+	}
 }
 
 // Target returns the peer that this peer tracker tracks tasks for
