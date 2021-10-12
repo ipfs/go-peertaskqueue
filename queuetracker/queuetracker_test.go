@@ -1,19 +1,19 @@
-package peertracker
+package queuetracker
 
 import (
 	"testing"
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/ipfs/go-peertaskqueue/peertask"
+	"github.com/ipfs/go-peertaskqueue/queuetask"
 	"github.com/ipfs/go-peertaskqueue/testutil"
 )
 
-const testMaxActiveWorkPerPeer = 100
+const testMaxActiveWorkPerQueue = 100
 
 func TestEmpty(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
 	tasks, _ := tracker.PopTasks(100)
 	if len(tasks) != 0 {
@@ -23,9 +23,9 @@ func TestEmpty(t *testing.T) {
 
 func TestPushPop(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 1,
@@ -44,9 +44,9 @@ func TestPushPop(t *testing.T) {
 
 func TestPopNegativeOrZeroSize(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 1,
@@ -66,9 +66,9 @@ func TestPopNegativeOrZeroSize(t *testing.T) {
 
 func TestPushPopSizeAndOrder(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -120,9 +120,9 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 
 func TestPopFirstItemAlways(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 20,
@@ -151,9 +151,9 @@ func TestPopFirstItemAlways(t *testing.T) {
 
 func TestPopItemsToCoverTargetWork(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 20,
@@ -187,9 +187,9 @@ func TestPopItemsToCoverTargetWork(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -219,9 +219,9 @@ func TestRemove(t *testing.T) {
 
 func TestRemoveMulti(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -251,9 +251,9 @@ func TestRemoveMulti(t *testing.T) {
 
 func TestTaskDone(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -293,19 +293,19 @@ func TestTaskDone(t *testing.T) {
 
 type permissiveTaskMerger struct{}
 
-func (*permissiveTaskMerger) HasNewInfo(task peertask.Task, existing []peertask.Task) bool {
+func (*permissiveTaskMerger) HasNewInfo(task queuetask.Task, existing []queuetask.Task) bool {
 	return true
 }
-func (*permissiveTaskMerger) Merge(task peertask.Task, existing *peertask.Task) {
+func (*permissiveTaskMerger) Merge(task queuetask.Task, existing *queuetask.Task) {
 	existing.Data = task.Data
 	existing.Work = task.Work
 }
 
 func TestReplaceTaskPermissive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -342,9 +342,9 @@ func TestReplaceTaskPermissive(t *testing.T) {
 
 func TestReplaceTaskSize(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -395,9 +395,9 @@ func TestReplaceTaskSize(t *testing.T) {
 
 func TestReplaceActiveTask(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -434,9 +434,9 @@ func TestReplaceActiveTask(t *testing.T) {
 
 func TestReplaceActiveTaskNonPermissive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &DefaultTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -472,9 +472,9 @@ func TestReplaceActiveTaskNonPermissive(t *testing.T) {
 
 func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -523,9 +523,9 @@ func TestReplaceTaskThatIsActiveAndPending(t *testing.T) {
 
 func TestRemoveActive(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerPeer)
+	tracker := New(partner, &permissiveTaskMerger{}, testMaxActiveWorkPerQueue)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,
@@ -581,7 +581,7 @@ func TestPushPopEqualTaskPriorities(t *testing.T) {
 	})
 	tracker := New(partner, &DefaultTaskMerger{}, 1)
 
-	tasks := []peertask.Task{
+	tasks := []queuetask.Task{
 		{
 			Topic:    "1",
 			Priority: 10,

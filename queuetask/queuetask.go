@@ -1,10 +1,9 @@
-package peertask
+package queuetask
 
 import (
 	"time"
 
 	pq "github.com/ipfs/go-ipfs-pq"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 type QueueTaskComparator func(a, b *QueueTask) bool
@@ -14,7 +13,7 @@ var FIFOCompare = func(a, b *QueueTask) bool {
 	return a.created.Before(b.created)
 }
 
-// PriorityCompare respects the target peer's task priority. For tasks involving
+// PriorityCompare respects the target queues's task priority. For tasks involving
 // different peers, the oldest task is prioritized.
 var PriorityCompare = func(a, b *QueueTask) bool {
 	if a.Target == b.Target && a.Priority != b.Priority {
@@ -38,6 +37,9 @@ type Topic interface{}
 // Data is used by the client to associate extra information with a Task
 type Data interface{}
 
+// Target is an indentifier for a queue a task will run on
+type Target interface{}
+
 // Task is a single task to be executed in Priority order.
 type Task struct {
 	// Topic for the task
@@ -56,13 +58,13 @@ type Task struct {
 // It is used internally by the PeerTracker to keep track of tasks.
 type QueueTask struct {
 	Task
-	Target  peer.ID
+	Target  Target
 	created time.Time // created marks the time that the task was added to the queue
 	index   int       // book-keeping field used by the pq container
 }
 
 // NewQueueTask creates a new QueueTask from the given Task.
-func NewQueueTask(task Task, target peer.ID, created time.Time) *QueueTask {
+func NewQueueTask(task Task, target interface{}, created time.Time) *QueueTask {
 	return &QueueTask{
 		Task:    task,
 		Target:  target,
