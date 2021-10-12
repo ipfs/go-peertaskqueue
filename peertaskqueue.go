@@ -24,6 +24,8 @@ type hookFunc func(p peer.ID, event peerTaskQueueEvent)
 // first if priorities are equal.
 type PeerTaskQueue struct {
 	lock                      sync.Mutex
+	peerComparator            peertracker.PeerComparator
+	taskComparator            peertask.QueueTaskComparator
 	pQueue                    pq.PQ
 	peerTrackers              map[peer.ID]*peertracker.PeerTracker
 	frozenPeers               map[peer.ID]struct{}
@@ -112,15 +114,40 @@ func OnPeerRemovedHook(onPeerRemovedHook func(p peer.ID)) Option {
 	return addHook(hook)
 }
 
+// PeerComparator is an option that specifies custom peer prioritization logic.
+func PeerComparator(pc peertracker.PeerComparator) Option {
+	return func(ptq *PeerTaskQueue) Option {
+		previous := ptq.peerComparator
+		ptq.peerComparator = pc
+		return PeerComparator(previous)
+	}
+}
+
+// TaskComparator is an option that specifies custom task prioritization logic.
+func TaskComparator(tc peertask.QueueTaskComparator) Option {
+	return func(ptq *PeerTaskQueue) Option {
+		previous := ptq.taskComparator
+		ptq.taskComparator = tc
+		return TaskComparator(previous)
+	}
+}
+
 // New creates a new PeerTaskQueue
 func New(options ...Option) *PeerTaskQueue {
 	ptq := &PeerTaskQueue{
-		peerTrackers: make(map[peer.ID]*peertracker.PeerTracker),
-		frozenPeers:  make(map[peer.ID]struct{}),
-		pQueue:       pq.New(peertracker.PeerCompare),
-		taskMerger:   &peertracker.DefaultTaskMerger{},
+		peerComparator: peertracker.DefaultPeerComparator,
+		peerTrackers:   make(map[peer.ID]*peertracker.PeerTracker),
+		frozenPeers:    make(map[peer.ID]struct{}),
+		taskMerger:     &peertracker.DefaultTaskMerger{},
 	}
 	ptq.Options(options...)
+	ptq.pQueue = pq.New(
+		func(a, b pq.Elem) bool {
+			pa := a.(*peertracker.PeerTracker)
+			pb := b.(*peertracker.PeerTracker)
+			return ptq.peerComparator(pa, pb)
+		},
+	)
 	return ptq
 }
 
@@ -171,7 +198,11 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 
 	peerTracker, ok := ptq.peerTrackers[to]
 	if !ok {
-		peerTracker = peertracker.New(to, ptq.taskMerger, ptq.maxOutstandingWorkPerPeer)
+		var opts []peertracker.Option
+		if ptq.taskComparator != nil {
+			opts = append(opts, peertracker.WithQueueTaskComparator(ptq.taskComparator))
+		}
+		peerTracker = peertracker.New(to, ptq.taskMerger, ptq.maxOutstandingWorkPerPeer, opts...)
 		ptq.pQueue.Push(peerTracker)
 		ptq.peerTrackers[to] = peerTracker
 		ptq.callHooks(to, peerAdded)

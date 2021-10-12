@@ -7,6 +7,8 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
+type QueueTaskComparator func(a, b *QueueTask) bool
+
 // FIFOCompare is a basic task comparator that returns tasks in the order created.
 var FIFOCompare = func(a, b *QueueTask) bool {
 	return a.created.Before(b.created)
@@ -23,7 +25,7 @@ var PriorityCompare = func(a, b *QueueTask) bool {
 
 // WrapCompare wraps a QueueTask comparison function so it can be used as
 // comparison for a priority queue
-func WrapCompare(f func(a, b *QueueTask) bool) func(a, b pq.Elem) bool {
+func WrapCompare(f QueueTaskComparator) func(a, b pq.Elem) bool {
 	return func(a, b pq.Elem) bool {
 		return f(a.(*QueueTask), b.(*QueueTask))
 	}
