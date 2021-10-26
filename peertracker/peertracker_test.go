@@ -293,7 +293,7 @@ func TestTaskDone(t *testing.T) {
 
 type permissiveTaskMerger struct{}
 
-func (*permissiveTaskMerger) HasNewInfo(task peertask.Task, existing []peertask.Task) bool {
+func (*permissiveTaskMerger) HasNewInfo(task peertask.Task, existing []*peertask.Task) bool {
 	return true
 }
 func (*permissiveTaskMerger) Merge(task peertask.Task, existing *peertask.Task) {
@@ -421,6 +421,8 @@ func TestReplaceActiveTask(t *testing.T) {
 		t.Fatal("Expected 1 task")
 	}
 
+	a := popped[0]
+
 	// Push task "b"
 	tracker.PushTasks(tasks[1]) // Topic "1"
 
@@ -429,6 +431,21 @@ func TestReplaceActiveTask(t *testing.T) {
 	popped, _ = tracker.PopTasks(100)
 	if len(popped) != 1 {
 		t.Fatal("Expected 1 task")
+	}
+
+	b := popped[0]
+
+	// Finish tasks
+	if tracker.IsIdle() {
+		t.Error("expected an active task")
+	}
+	tracker.TaskDone(a)
+	if tracker.IsIdle() {
+		t.Error("expected an active task")
+	}
+	tracker.TaskDone(b)
+	if !tracker.IsIdle() {
+		t.Error("no active tasks")
 	}
 }
 
