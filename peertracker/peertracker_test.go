@@ -293,7 +293,7 @@ func TestTaskDone(t *testing.T) {
 
 type permissiveTaskMerger struct{}
 
-func (*permissiveTaskMerger) HasNewInfo(task peertask.Task, existing []peertask.Task) bool {
+func (*permissiveTaskMerger) HasNewInfo(task peertask.Task, existing []*peertask.Task) bool {
 	return true
 }
 func (*permissiveTaskMerger) Merge(task peertask.Task, existing *peertask.Task) {
