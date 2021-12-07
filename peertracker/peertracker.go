@@ -171,6 +171,28 @@ func (p *PeerTracker) Stats() *PeerTrackerStats {
 	return &PeerTrackerStats{NumPending: len(p.pendingTasks), NumActive: len(p.activeTasks)}
 }
 
+// PeerTrackerTopics captures the current state of topics in this peers queue
+type PeerTrackerTopics struct {
+	Pending []peertask.Topic
+	Active  []peertask.Topic
+}
+
+// Topics gives a full list of current and active topics for this peer
+// Stats returns current statistics for this peer.
+func (p *PeerTracker) Topics() *PeerTrackerTopics {
+	p.activelk.Lock()
+	defer p.activelk.Unlock()
+	pending := make([]peertask.Topic, 0, len(p.pendingTasks))
+	for topic := range p.pendingTasks {
+		pending = append(pending, topic)
+	}
+	active := make([]peertask.Topic, 0, len(p.activeTasks))
+	for topic := range p.activeTasks {
+		active = append(active, topic)
+	}
+	return &PeerTrackerTopics{Pending: pending, Active: active}
+}
+
 // Index implements pq.Elem.
 func (p *PeerTracker) Index() int {
 	return p.index

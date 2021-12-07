@@ -1,6 +1,8 @@
 package peertracker
 
 import (
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -98,6 +100,20 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 		t.Fatal("Expected pending work to be 20")
 	}
 
+	topics := tracker.Topics()
+	if len(topics.Active) != 1 || topics.Active[0] != popped[0].Topic {
+		t.Fatal("Expected 1 active topic with popped task's topic")
+	}
+	if len(topics.Pending) != 2 {
+		t.Fatal("Expected pending topics to be 2")
+	}
+	if !(topics.Pending[0] == "1" || topics.Pending[1] == "1") {
+		t.Fatal("Missing pending topic")
+	}
+	if !(topics.Pending[0] == "3" || topics.Pending[1] == "3") {
+		t.Fatal("Missing pending topic")
+	}
+
 	popped, pending = tracker.PopTasks(100)
 	if len(popped) != 2 {
 		t.Fatal("Expected 2 tasks")
@@ -107,6 +123,19 @@ func TestPushPopSizeAndOrder(t *testing.T) {
 	}
 	if pending != 0 {
 		t.Fatal("Expected pending work to be 0")
+	}
+
+	topics = tracker.Topics()
+	if len(topics.Active) != 3 {
+		t.Fatal("Expected 3 active topics")
+	}
+	if len(topics.Pending) != 0 {
+		t.Fatal("Expected no pending topics")
+	}
+	stringTopics := []string{topics.Active[0].(string), topics.Active[1].(string), topics.Active[2].(string)}
+	sort.Strings(stringTopics)
+	if !reflect.DeepEqual(stringTopics, []string{"1", "2", "3"}) {
+		t.Fatal("Expected active topics to be 1, 2, 3")
 	}
 
 	popped, pending = tracker.PopTasks(100)
@@ -271,23 +300,68 @@ func TestTaskDone(t *testing.T) {
 	// Push task "a"
 	tracker.PushTasks(tasks[0]) // Topic "1"
 
+	// Check topic state
+	topics := tracker.Topics()
+	if len(topics.Active) != 0 {
+		t.Fatal("Expected no active topics")
+	}
+	if len(topics.Pending) != 1 {
+		t.Fatal("Expected 1 pending topics")
+	}
+
 	// Pop task "a". This makes the task active.
 	popped, _ := tracker.PopTasks(10)
 	if len(popped) != 1 {
 		t.Fatal("Expected 1 task")
 	}
 
+	// Check topic state
+	topics = tracker.Topics()
+	if len(topics.Active) != 1 {
+		t.Fatal("Expected 1 active topics")
+	}
+	if len(topics.Pending) != 0 {
+		t.Fatal("Expected no pending topics")
+	}
+
 	// Mark task "a" as done.
 	tracker.TaskDone(popped[0])
 
+	// Check topic state
+	topics = tracker.Topics()
+	if len(topics.Active) != 0 {
+		t.Fatal("Expected no active topics")
+	}
+	if len(topics.Pending) != 0 {
+		t.Fatal("Expected no pending topics")
+	}
+
 	// Push task "b"
 	tracker.PushTasks(tasks[1]) // Topic "1"
+
+	// Check topic state
+	topics = tracker.Topics()
+	if len(topics.Active) != 0 {
+		t.Fatal("Expected no active topics")
+	}
+	if len(topics.Pending) != 1 {
+		t.Fatal("Expected 1 pending topics")
+	}
 
 	// Pop all tasks. Task "a" was done so task "b" should have been allowed to
 	// be added.
 	popped, _ = tracker.PopTasks(100)
 	if len(popped) != 1 {
 		t.Fatal("Expected 1 task")
+	}
+
+	// Check topic state
+	topics = tracker.Topics()
+	if len(topics.Active) != 1 {
+		t.Fatal("Expected 1 active topics")
+	}
+	if len(topics.Pending) != 0 {
+		t.Fatal("Expected no pending topics")
 	}
 }
 

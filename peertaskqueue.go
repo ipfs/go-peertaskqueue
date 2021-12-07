@@ -191,6 +191,17 @@ func (ptq *PeerTaskQueue) Stats() *PeerTaskQueueStats {
 	return s
 }
 
+// PeerTopics returns all topics running on a specific peer
+func (ptq *PeerTaskQueue) PeerTopics(p peer.ID) *peertracker.PeerTrackerTopics {
+	ptq.lock.Lock()
+	defer ptq.lock.Unlock()
+	pt, ok := ptq.peerTrackers[p]
+	if !ok {
+		return nil
+	}
+	return pt.Topics()
+}
+
 // PushTasks adds a new group of tasks for the given peer to the queue
 func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 	ptq.lock.Lock()
