@@ -227,10 +227,11 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 // off the peer's queue as necessary to cover targetMinWork, in priority order.
 // If there are not enough tasks to cover targetMinWork it just returns
 // whatever is in the peer's queue.
-// - Peers with the most "active" work are deprioritized.
-//   This heuristic is for fairness, we try to keep all peers "busy".
-// - Peers with the most "pending" work are prioritized.
-//   This heuristic is so that peers with a lot to do get asked for work first.
+//   - Peers with the most "active" work are deprioritized.
+//     This heuristic is for fairness, we try to keep all peers "busy".
+//   - Peers with the most "pending" work are prioritized.
+//     This heuristic is so that peers with a lot to do get asked for work first.
+//
 // The third response argument is pending work: the amount of work in the
 // queue for this peer.
 func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task, int) {
