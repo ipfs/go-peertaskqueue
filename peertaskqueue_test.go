@@ -10,7 +10,7 @@ import (
 
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/testutil"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 func TestPushPop(t *testing.T) {
@@ -90,22 +90,22 @@ func TestFreezeUnfreeze(t *testing.T) {
 	}
 
 	// now, pop off four tasks, there should be one from each
-	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+	matchNTasks(t, ptq, 4, a.String(), b.String(), c.String(), d.String())
 
 	ptq.Remove("1", b)
 
 	// b should be frozen, causing it to get skipped in the rotation
-	matchNTasks(t, ptq, 3, a.Pretty(), c.Pretty(), d.Pretty())
+	matchNTasks(t, ptq, 3, a.String(), c.String(), d.String())
 
 	ptq.ThawRound()
 
-	matchNTasks(t, ptq, 1, b.Pretty())
+	matchNTasks(t, ptq, 1, b.String())
 
 	// remove none existent task
 	ptq.Remove("-1", b)
 
 	// b should not be frozen
-	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+	matchNTasks(t, ptq, 4, a.String(), b.String(), c.String(), d.String())
 
 }
 
@@ -128,12 +128,12 @@ func TestFreezeUnfreezeNoFreezingOption(t *testing.T) {
 	}
 
 	// now, pop off four tasks, there should be one from each
-	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+	matchNTasks(t, ptq, 4, a.String(), b.String(), c.String(), d.String())
 
 	ptq.Remove("1", b)
 
 	// b should not be frozen, so it wont get skipped in the rotation
-	matchNTasks(t, ptq, 4, a.Pretty(), b.Pretty(), c.Pretty(), d.Pretty())
+	matchNTasks(t, ptq, 4, a.String(), b.String(), c.String(), d.String())
 }
 
 // This test checks that ordering of peers is correct
@@ -236,10 +236,10 @@ func TestHooks(t *testing.T) {
 	var peersAdded []string
 	var peersRemoved []string
 	onPeerAdded := func(p peer.ID) {
-		peersAdded = append(peersAdded, p.Pretty())
+		peersAdded = append(peersAdded, p.String())
 	}
 	onPeerRemoved := func(p peer.ID) {
-		peersRemoved = append(peersRemoved, p.Pretty())
+		peersRemoved = append(peersRemoved, p.String())
 	}
 	ptq := New(OnPeerAddedHook(onPeerAdded), OnPeerRemovedHook(onPeerRemoved))
 	peers := testutil.GeneratePeers(2)
@@ -247,7 +247,7 @@ func TestHooks(t *testing.T) {
 	b := peers[1]
 	ptq.PushTasks(a, peertask.Task{Topic: "1"})
 	ptq.PushTasks(b, peertask.Task{Topic: "2"})
-	expected := []string{a.Pretty(), b.Pretty()}
+	expected := []string{a.String(), b.String()}
 	sort.Strings(expected)
 	sort.Strings(peersAdded)
 	if len(peersAdded) != len(expected) {
@@ -316,7 +316,7 @@ func matchNTasks(t *testing.T, ptq *PeerTaskQueue, n int, expected ...string) {
 		if len(tsk) != 1 {
 			t.Fatal("expected 1 task at a time")
 		}
-		targets = append(targets, p.Pretty())
+		targets = append(targets, p.String())
 	}
 
 	matchArrays(t, expected, targets)
