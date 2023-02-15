@@ -15,7 +15,7 @@ import (
 
 func TestPushPop(t *testing.T) {
 	ptq := New()
-	partner := testutil.GeneratePeers(1)[0]
+	partners := testutil.GeneratePeers(2)
 	alphabet := strings.Split("abcdefghijklmnopqrstuvwxyz", "")
 	vowels := strings.Split("aeiou", "")
 	consonants := func() []string {
@@ -39,13 +39,19 @@ func TestPushPop(t *testing.T) {
 
 	// add a bunch of blocks. cancel some. drain the queue. the queue should only have the kept tasks
 
-	for _, index := range rand.Perm(len(alphabet)) { // add blocks for all letters
-		letter := alphabet[index]
-		t.Log(letter)
+	for _, partner := range partners {
+		for _, index := range rand.Perm(len(alphabet)) { // add blocks for all letters
+			letter := alphabet[index]
+			t.Log(letter)
 
-		// add tasks out of order, but with in-order priority
-		ptq.PushTasks(partner, peertask.Task{Topic: letter, Priority: math.MaxInt32 - index})
+			// add tasks out of order, but with in-order priority
+			ptq.PushTasks(partner, peertask.Task{Topic: letter, Priority: math.MaxInt32 - index})
+		}
 	}
+
+	ptq.Clear(partners[1])
+	partner, cleared := partners[0], partners[1]
+
 	for _, consonant := range consonants {
 		ptq.Remove(consonant, partner)
 	}
@@ -54,7 +60,10 @@ func TestPushPop(t *testing.T) {
 
 	var out []string
 	for {
-		_, received, _ := ptq.PopTasks(100)
+		pid, received, _ := ptq.PopTasks(100)
+		if pid == cleared {
+			t.Fatal("task from cleared peer shows up")
+		}
 		if len(received) == 0 {
 			break
 		}

@@ -344,3 +344,18 @@ func (ptq *PeerTaskQueue) ThawRound() {
 		}
 	}
 }
+
+// Clear fully remove a peer from the task queue.
+func (ptq *PeerTaskQueue) Clear(p peer.ID) {
+	ptq.lock.Lock()
+	defer ptq.lock.Unlock()
+
+	if peerTracker, ok := ptq.peerTrackers[p]; ok {
+		delete(ptq.peerTrackers, p)
+		ptq.pQueue.Remove(peerTracker.Index())
+	}
+
+	if _, ok := ptq.frozenPeers[p]; ok {
+		delete(ptq.frozenPeers, p)
+	}
+}
