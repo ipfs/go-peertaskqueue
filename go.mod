@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/benbjohnson/clock v1.3.0
-	github.com/ipfs/go-ipfs-pq v0.0.2
+	github.com/ipfs/go-ipfs-pq v0.0.3
 	github.com/libp2p/go-libp2p v0.22.0
 )
 

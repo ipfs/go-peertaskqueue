@@ -35,6 +35,13 @@ func TestPushPop(t *testing.T) {
 		},
 	}
 	tracker.PushTasks(tasks...)
+
+	tracker.PushTasksTruncated(1, peertask.Task{
+		Topic:    "2",
+		Priority: 2,
+		Work:     20,
+	})
+
 	popped, _ := tracker.PopTasks(100)
 	if len(popped) != 1 {
 		t.Fatal("Expected 1 task")

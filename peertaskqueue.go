@@ -1,6 +1,7 @@
 package peertaskqueue
 
 import (
+	"math"
 	"sync"
 
 	pq "github.com/ipfs/go-ipfs-pq"
@@ -204,6 +205,13 @@ func (ptq *PeerTaskQueue) PeerTopics(p peer.ID) *peertracker.PeerTrackerTopics {
 
 // PushTasks adds a new group of tasks for the given peer to the queue
 func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
+	ptq.PushTasksTruncated(math.MaxUint, to, tasks...)
+}
+
+// PushTasksTruncated is like PushTasks but it will not grow that peers's queue beyond n.
+// When truncation happen we will keep older tasks in the queue to avoid some infinite
+// tasks rotations if we are continously receiving work faster than we process it.
+func (ptq *PeerTaskQueue) PushTasksTruncated(n uint, to peer.ID, tasks ...peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
 
@@ -219,7 +227,7 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 		ptq.callHooks(to, peerAdded)
 	}
 
-	peerTracker.PushTasks(tasks...)
+	peerTracker.PushTasksTruncated(n, tasks...)
 	ptq.pQueue.Update(peerTracker.Index())
 }
 
