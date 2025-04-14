@@ -1,6 +1,7 @@
 module github.com/ipfs/go-peertaskqueue
 
 go 1.23
+toolchain go1.24.1
 
 require (
 	github.com/filecoin-project/go-clock v0.1.0
@@ -23,9 +24,9 @@ require (
 	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 	lukechampine.com/blake3 v1.3.0 // indirect
 )
