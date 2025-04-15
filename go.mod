@@ -1,7 +1,6 @@
 module github.com/ipfs/go-peertaskqueue
 
-go 1.23
-toolchain go1.24.1
+go 1.23.0
 
 require (
 	github.com/filecoin-project/go-clock v0.1.0
