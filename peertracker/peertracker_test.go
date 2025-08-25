@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/go-clock"
+	"github.com/coder/quartz"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/testutil"
 )
@@ -671,7 +671,7 @@ func TestRemoveActive(t *testing.T) {
 
 func TestPushPopEqualTaskPriorities(t *testing.T) {
 	partner := testutil.GeneratePeers(1)[0]
-	clock := clock.NewMock()
+	clock := quartz.NewMock(t)
 	oldClock := clockInstance
 	clockInstance = clock
 	t.Cleanup(func() {
@@ -697,9 +697,9 @@ func TestPushPopEqualTaskPriorities(t *testing.T) {
 		},
 	}
 	tracker.PushTasks(tasks[0])
-	clock.Add(10 * time.Millisecond)
+	clock.Advance(10 * time.Millisecond)
 	tracker.PushTasks(tasks[1])
-	clock.Add(10 * time.Millisecond)
+	clock.Advance(10 * time.Millisecond)
 	tracker.PushTasks(tasks[2])
 	popped, _ := tracker.PopTasks(1)
 	if len(popped) != 1 {

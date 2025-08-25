@@ -3,7 +3,7 @@ module github.com/ipfs/go-peertaskqueue
 go 1.24
 
 require (
-	github.com/filecoin-project/go-clock v0.1.0
+	github.com/coder/quartz v0.2.1
 	github.com/ipfs/go-ipfs-pq v0.0.3
 	github.com/libp2p/go-libp2p v0.43.0
 )

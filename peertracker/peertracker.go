@@ -5,13 +5,13 @@ import (
 	"math/bits"
 	"sync"
 
-	"github.com/filecoin-project/go-clock"
+	"github.com/coder/quartz"
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-var clockInstance = clock.New()
+var clockInstance = quartz.NewReal()
 
 // TaskMerger is an interface that is used to merge new tasks into the active
 // and pending queues
