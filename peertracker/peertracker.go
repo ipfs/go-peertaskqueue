@@ -344,9 +344,7 @@ func (p *PeerTracker) TaskDone(task *peertask.Task) {
 		delete(p.activeTasks, task.Topic)
 	} else {
 		// Garbage collection.
-		for i := len(newTasks); i < len(activeTasks); i++ {
-			activeTasks[i] = nil
-		}
+		clear(activeTasks[len(newTasks):])
 
 		p.activeTasks[task.Topic] = newTasks
 	}
